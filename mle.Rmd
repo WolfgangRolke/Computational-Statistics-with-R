@@ -1,0 +1,629 @@
+---
+title: Parameter Estimation, Maximum Likelihood
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+In this section we will study the problem of parameter estimation. In its most general form this is as follows: we have a sample $X_1,..,X_n$ from some probability density $f(x;\theta)$. Here both x and $\theta$ might be vectors. Also we will use the term density for both the discrete and the continuous case. 
+
+The problem is to find an estimate of $\theta$ based on the data $X_1,..,X_n$, that is a function (called a *statistic*) $T(X_1,..,X_n)$ such that in some sense $T(X_1,..,X_n) \approx \theta$.
+
+### Likelihood function
+
+say we have $X_1,..,X_n \sim f(x;\theta)$ and independent. Then the joint density of $\mathbf{X}= (X_1,..,X_n)$ is given by $f(\mathbf{x};\theta)=\prod_{i=1}^n f(x_i;\theta)$
+
+The **likelihood function L** is defined by
+
+$$
+L(\theta;\mathbf{x})=\prod_{i=1}^n f(x_i;\theta)
+$$
+this does not seem to be much: the right hand side is the same. However, it is a very different expression: in $f(\mathbf{x};\theta)$ $\mathbf{x}$ is the variable and $\theta$ is an (unknown) constant. In $L(\theta;\mathbf{x})$ $\theta$ is the variable and $\mathbf{x}$ is a (known) constant.
+
+It is the essential difference of **before** the experiment, when one might ask questions of probability, and **after** the experiment, when one asks questions of statistics.
+
+Closely related is the **log-likelihood function**
+
+$$
+l(\theta;\mathbf{x})=\log L(\theta;\mathbf{x})=\sum_{i=1}^n \log f(x_i;\theta)
+$$
+The log-likelihood is often easier to work with, not the least because it turns a product into a sum.
+
+There is a principle in Statistics that suggests that any inference should always be based on the likelihood function. 
+
+#### **Example**: Normal mean
+
+Say $X_i \sim N(\mu, \sigma)$ so
+
+$$
+\begin{aligned}
+&l(\mu;\mathbf{x}, \sigma)    = \\
+&\sum_{i=1}^n \log \frac1{\sqrt{2\pi \sigma^2}} \exp \left\{- \frac1{2\sigma^2} (x_i-\mu)^2 \right\}   = \\
+&\frac{n}2 \log (2\pi \sigma^2) -  \frac1{2\sigma^2} \sum_{i=1}^n  (x_i-\mu)^2 \\
+\end{aligned} 
+$$
+Now let $\bar{x}=\frac1n \sum x_i^2$, then
+
+$$
+\begin{aligned}
+&\sum_{i=1}^n  (x_i-\mu)^2    = \\
+&\sum_{i=1}^n  (x_i-\bar{x}+\bar{x}-\mu)^2    = \\
+& \sum_{i=1}^n  (x_i-\bar{x})^2 + 2\sum_{i=1}^n (x_i-\bar{x})(\bar{x}-\mu)+\sum_{i=1}^n (\bar{x}-\mu)^2    = \\
+& \sum_{i=1}^n  (x_i-\bar{x})^2 + 2(\bar{x}-\mu)\sum_{i=1}^n (x_i-\bar{x})+n(\bar{x}-\mu)^2    = \\
+& \sum_{i=1}^n  (x_i-\bar{x})+2 + 2(\bar{x}-\mu)(\sum_{i=1}^n x_i-n\bar{x})+n(\bar{x}-\mu)^2    = \\
+& \sum_{i=1}^n  (x_i-\bar{x})^2+n(\bar{x}-\mu)^2  
+\end{aligned}
+$$
+and so
+
+$$
+l(\mu;\mathbf{x}, \sigma)    = \text{const}-\frac{1}{2\sigma^2/n} (\mu-\bar{x})^2
+$$
+so as a function of $\mu$ the log-likelihood is a quadratic function with vertex at $\bar{x}$
+
+#### **Example**: Binomial proportions
+
+in a survey 567 people 235 said they prefer Coke over Pepsi. What is the percentage of people who prefer Coke over Pepsi?
+
+The answer is obvious: 235/567. However, let's work this out in detail. First, each person is a *Bernoulli trial* (yes/no) with some success probability $\pi$. So we have
+
+$$
+P(X_i=1)=1-P(X_i=0)=\pi
+$$
+
+We can write this as 
+
+$$
+f(x)=\pi^x(1-\pi)^{1-x} \text{, }x=0,1
+$$
+
+the joint density is given by
+
+$$
+\begin{aligned}
+&f(x_1, .., x_n)= \\
+&\prod_{i=1}^n  \pi^x_i(1-\pi)^{1-x_i}    = \\
+& \pi^{\sum x_i}(1-\pi)^ {\sum(1-x_i)}   = \\
+& \pi^y(1-\pi)^{n-y} \\
+\end{aligned}
+$$
+
+and the log likelihood is
+
+$$
+\begin{aligned}
+&l(\pi;y,n)  = y\log \pi +(n-y) \log (1-\pi)\\
+\end{aligned}
+$$
+
+### Maximum Likelihood estimation
+
+The idea of maximum likelihood estimation is to find that value of $\theta$ that maximizes the likelihood function.
+
+Of course a function $L$ has a maximum at x iff $\log L$ has a maximum at x, so we can also (and easier!) maximize the log-likelihood function
+
+#### **Example**: Normal mean
+
+$$
+\frac{dl(\mu;\mathbf{x}, \sigma)}{d\mu}    = -\frac{1}{\sigma^2/n} (\mu-\bar{x})=0
+$$
+so $\hat{\mu} = \bar{x}$
+
+This is of course a maximum, and not a mimimum or an inflection point because $-\frac{1}{\sigma^2/n}<0$.
+
+#### **Example**: Binomial proportion
+
+$$
+\begin{aligned}
+&\frac{dl}{d\pi}=\frac{y}{\pi}-\frac{n-y}{1-\pi} =0 \\
+&\hat{\pi} =\frac{y}{n}
+\end{aligned}
+$$
+and for our numbers we find $\hat{\pi}=235/527=0.4459$
+
+`r hl()$hr()`
+
+The above calculations require some calculus. Sometimes we can let R take care of this for us:
+
+```{r}
+ll <- function(pi, y, n) 
+  log(dbinom(y, n, pi))
+pi <- seq(0.4, 0.491, length=1000)
+df <- data.frame(pi=pi, ll=ll(pi, 235, 527))
+mle <- df$pi[df$ll==max(df$ll)]
+mle
+ggplot(df, aes(x=pi, y=ll)) + 
+  geom_line() +
+  geom_vline(xintercept = mle)
+```
+
+notice that the log-likelihood curve looks a lot like a parabola. This will come in handy soon!
+
+#### **Example**: Beta distribution
+
+A random variable is said to have a Beta density if
+
+$$
+f(x;\alpha,\beta)=\frac{\Gamma(\alpha+\beta)}{\Gamma(\alpha)\Gamma(\beta)}x^{\alpha-1}(1-x)^{\beta-1}
+$$
+here $\Gamma$ is the famous gamma function
+
+$$
+\Gamma(x)=\int_0^{\infty} t^{x-1}e^{-t}dt
+$$
+Say this is a sample from a Beta distribution
+
+```{r}
+set.seed(1111)
+x <- sort(round(rbeta(500, 2, 4), 3))
+beta.ex <- data.frame(x=x)
+```
+
+```{r}
+bw <- diff(range(x))/50 
+ggplot(beta.ex, aes(x)) +
+  geom_histogram(aes(y = ..density..),
+    color = "black", 
+    fill = "white", 
+    binwidth = bw) + 
+    labs(x = "x", y = "Density") 
+```    
+
+and we want to estimate $\alpha, \beta$. 
+
+Now doing this with calculus is out because the log-likelihood function doesn't exist in closed form. Instead we will need to use a numerical method. Because the Beta distribution is a standard one, there is an R routine to do it for us. It is part of the package
+
+```{r}
+library(MASS)
+fitdistr(x, 
+         densfun="Beta",
+         start=list(shape1=1,shape2=1))
+```
+
+#### **Example**: linear density
+
+here are observations from a linear density $f(x|a)=2ax+1-a$, $0<x<1$ and $-1<a<1$:
+
+```{r echo=FALSE, comment=""}
+a <- 0.2
+x <- (a-1+sqrt((1-a)^2+4*a*runif(150)))/2/a
+x <- sort(round(x, 3))
+cat(x)
+```
+
+We want to estimate a. So let's see:
+
+$$
+\begin{aligned}
+&f(x|a)    = \prod_{i=1}^n \left[2ax_i+1-a \right] =\\
+&l(a) =\sum_{i=1}^n \log \left[2ax_i+1-a \right] \\
+&\frac{dl}{da}=\sum_{i=1}^n\frac{2x_i-1}{2ax_i+1-a}=0
+\end{aligned}
+$$
+and this equation can not be solved analytically. Unfortunately this is not one of the distributions included in *fitdistr*, so we need to find a numerical solution ourselves. 
+
+Here are several:
+
+### Simple Grid Search
+
+Let's draw the curve of $\frac{dl}{da}$. In what follows x is the data above.
+
+```{r}
+f <- function(a) {
+  y <- a
+  for(i in seq_along(a)) 
+    y[i] <- sum( (2*x-1)/(2*a[i]*x+1-a[i]) )
+  y
+}  
+curve(f, -0.5, 0.5)
+abline(h=0)
+a <- seq(-0.5, 0.5, length=1000)
+y <- f(a)
+# find value of a where y is closest to 0
+mle <- a[abs(y)==min(abs(y))]
+abline(v=mle)
+mle
+```
+
+### Bisection Algorithm
+
+The idea is this: our function is positive for a=-0.5 and negative for a=0.5. It is also continuous and decreasing. So we can find the zero by checking midpoints and adjusting the upper or lower limit accordingly:
+
+```{r}
+curve(f, -0.5, 0.5)
+abline(h=0)
+low <- (-0.5)
+high <- 0.5
+repeat {
+  mid <- (low+high)/2
+  y <- f(mid)
+  print(c(mid, y))
+  abline(v=mid)
+  if(y>0) low <- mid
+  else high <- mid
+  if(high-low<0.0001) break  
+}
+```
+
+### Newton's Method
+
+Isaak Newton invented the following algorithm: we want to solve the equation $f(x)=0$. Let x~0~ be some starting point. Then find successive points with 
+$$
+x_{n+1} = x_n - f(x_n)/f'(x_n)
+$$
+
+notice that if this sequence converges to x we have 
+
+$$
+x = x - f(x)/f'(x)
+$$
+and so $f(x)=0$.
+
+In our case we have $f(a) = \frac{dl}{da}$ and so we also need
+
+$$
+f'(a) = \frac{d^2l}{da^2}=-\sum_{i=1}^n\left( \frac{2x_i-1}{2ax_i+1-a} \right)^2
+$$
+we find
+
+```{r}
+f.prime<- function(a) {
+  y <- a
+  for(i in seq_along(a)) 
+    y[i] <- (-1)*sum( ((2*x-1)/(2*a[i]*x+1-a[i]))^2 )
+  y
+}
+curve(f, -0.5, 0.5)
+abline(h=0)
+x.old <- 0
+abline(v=x.old)
+repeat {
+  x.new <- x.old - f(x.old)/f.prime(x.old)
+  print(x.new)
+  abline(v=x.new)
+  if(abs(x.old-x.new)<0.0001) break  
+  x.old <- x.new
+}
+```
+
+Notice that his converges much faster, it only needed three "rounds". This is typically true, however Newton's method also can fail badly if the starting point is not good enough.
+
+#### **Example** Old Faithful guyser
+
+Consider the waiting times of the famous Old Faithful data:
+
+```{r}
+bw <- diff(range(faithful$Waiting.Time))/50 
+ggplot(faithful, aes(Waiting.Time)) +
+          geom_histogram(color = "black", 
+                 fill = "white", 
+                 binwidth = bw) + 
+  labs(x = "Waiting Times", y = "Counts")
+```
+
+What would be a useful model for this data? We can try a *normal mixture*:
+
+$$
+\alpha N(\mu_1, \sigma_1) +(1-\alpha) N(\mu_2, \sigma_2)
+$$
+
+It seems that the two parts split at around 65, so we find
+
+```{r}
+x <- faithful$Waiting.Time
+round(c(mean(x[x<65]), mean(x[x>65])), 1)
+round(c(sd(x[x<65]), sd(x[x>65])), 1)
+```
+
+How about $\alpha$? Let's find the mle:
+
+$$
+\begin{aligned}
+&\phi(x, \mu, \sigma)    = \frac1{\sqrt{2\pi\sigma^2}}\exp^{-\frac1{2\sigma^2}(x-\mu)^2}\\
+&l(\alpha)    = \sum \log \left[ \alpha\phi(x_i, \mu_1, \sigma_1) + (1-\alpha) \phi(x_i, \mu_2, \sigma_2) \right]\\
+&\frac{dl}{d\alpha} = \sum \frac{\phi(x_i, \mu_1, \sigma_1) - \phi(x_i, \mu_2, \sigma_2)}{\alpha\phi(x_i, \mu_1, \sigma_1) + (1-\alpha) \phi(x_i, \mu_2, \sigma_2)}     \\
+&\frac{d^2l}{d\alpha^2} = (-1) \sum \left( \frac{\phi(x_i, \mu_1, \sigma_1) - \phi(x_i, \mu_2, \sigma_2)}{\alpha\phi(x_i, \mu_1, \sigma_1) + (1-\alpha) \phi(x_i, \mu_2, \sigma_2) } \right)^2     
+\end{aligned}
+$$
+
+```{r}
+f <- function(alpha, mu1=54.1, sigma1=5.4,
+              mu2=80, sigma2=5.9,
+              x=faithful$Waiting.Time) {
+  u <- dnorm(x, mu1, sigma1)
+  v <- dnorm(x, mu2, sigma2)
+  y1 <- alpha
+  y2 <- alpha
+  for(i in 1:seq_along(alpha)) {
+    tmp <- (u-v)/(alpha[i]*u+(1-alpha[i])*v)
+    y1[i] <- sum(tmp)
+    y2[i] <- (-1)*sum(tmp^2)
+  }
+  list(y1, y2)
+}
+alpha.old <- 0.5
+repeat {
+  tmp <- f(alpha.old)
+  alpha.new <- alpha.old - tmp[[1]]/tmp[[2]]
+  print(alpha.new)
+  if(abs(alpha.old-alpha.new)<0.0001) break  
+  alpha.old <- alpha.new
+}
+alpha <- alpha.old
+alpha
+```
+
+Let's see what this looks like:
+
+```{r error=TRUE}
+x <- seq(min(faithful$Waiting.Time),
+         max(faithful$Waiting.Time),
+         length=250)
+y <- alpha*dnorm(x, 54.1, 5.4) + 
+     (1-alpha)*dnorm(x, 80, 5.9)
+df <- data.frame(x=x, y=y)
+bw <- diff(range(faithful$Waiting.Time))/50 
+ggplot(faithful, aes(Waiting.Time)) +
+  geom_histogram(aes(y = ..density..),
+                 color = "black", 
+                 fill = "white", 
+                 binwidth = bw) + 
+  labs(x = "Waiting Times", y = "Counts") +
+  geom_line(aes(x, y), 
+            data=df,
+            inherit.aes = FALSE)
+
+```
+
+How about the other parameters? Can we fit for them as well? What we need is a multivariate version of Newton's method:
+
+Say we have the equation
+
+$$
+\begin{aligned}
+&f(x_1, .., x_n)=0 \\
+\end{aligned}
+$$
+Define the gradient $\Delta$ and the Hessian matrix H by
+
+$$
+\Delta_i(x) = \frac{df}{dx_i}(x_1,..,x_n) \\
+H_{i,j}(x) = \frac{d^2f}{dx_i dx_j}(x_1,..,x_n)
+$$
+then the algorithm is 
+
+$$
+x_{new} = x_{old}-H_{i,j}^{-1}(x_{old})\Delta_i(x_{old})
+$$
+
+Let's fix $\alpha=0.355$, $\sigma_1=5.4$ and $\sigma_2=5.9$ and fit for $\mu_1$ and $\mu_2$. 
+
+$$
+\begin{aligned}
+&f(\mu)=\phi(x, \mu,\sigma)    = \frac1{\sqrt{2\pi\sigma^2}} \exp \left({-\frac1{2\sigma^2}} (x-\mu)^2\right)\\
+&f'(\mu)=\frac{d \phi}{d\mu}  =\frac1{\sqrt{2\pi\sigma^2}} \exp \left({-\frac1{2\sigma^2}} (x-\mu)^2 \right) \frac{x-\mu}{\sigma^2} = \\
+& (x-\mu)f/\sigma^2\\
+&f''(\mu)=-f/\sigma^2+(x-\mu)^2f/\sigma^4=\\
+&\left[ (x-\mu)^2-\sigma^2\right]f/\sigma^4
+\end{aligned}
+$$
+
+Let's use the following definitions (short-hands):
+
+$$
+\begin{aligned}
+&f_{i, j} = \phi(x_i, \mu_j, \sigma_j) \text{, } j=1,2 \\
+&\psi_i = \alpha f_{i,1}+(1-\alpha)f_{i,2}  \\
+&
+\end{aligned}
+$$
+so we have
+
+$$
+\begin{aligned}
+&l(\mu_1, \mu_2)    = \sum \log  \psi_i \\
+&\Delta_1  = \frac{dl}{d\mu_1} =
+\alpha\sum \frac{ f_{i,1}'}{\psi_i}\\
+&\Delta_2  = (1-\alpha)\sum \frac{f_{i,2}'}{\psi_i}\\
+&H_{1,1}  = \alpha \sum \frac{f_{i,1}''-\alpha f_{i,1}'^2 }{\psi_i}\\
+&H_{1,2}  = -(1-\alpha)\alpha \sum \frac{ f_{i,1}'f_{i,2}'}{\psi_i}\\
+&H_{2,1}=H_{1,2}\\
+&H_{2,2}  = (1-\alpha) \sum \frac{f_{i,2}''-(1-\alpha) f_{i,2}'^2 }{\psi_i}\\
+\end{aligned}
+$$
+
+Let's implement this:
+
+```{r}
+alpha <- 0.355
+sigma <- c(5.4, 5.9)
+mu.old <- c(50, 80)
+grad <- rep(0, 2)
+H <- diag(2)
+k <- 0
+x <- faithful$Waiting.Time
+repeat {
+  k <- k+1
+  f1 <- dnorm(x, mu.old[1], sigma[1])
+  f1.prime <- (x-mu.old[1])*f1/sigma[1]^2
+  f1.doubleprime <-
+    ((x-mu.old[1]^2-sigma[1]^2))*f1/sigma[1]^4
+  f2 <- dnorm(x, mu.old[2], sigma[2])
+  f2.prime <- (x-mu.old[2])*f2/sigma[2]^2
+  f2.doubleprime <-
+    ((x-mu.old[2]^2-sigma[2]^2))*f2/sigma[2]^4  
+  psi <- alpha*f1+(1-alpha)*f2
+  grad[1] <- alpha*sum(f1.prime/psi)
+  grad[2] <- (1-alpha)*sum(f2.prime/psi)
+  H[1, 1] <- alpha*sum((f1.doubleprime-alpha*f1.prime^2)/psi)
+  H[1, 2] <- (alpha-1)*alpha*sum((f1.prime*f2.prime)/psi)
+  H[2, 1] <- H[2, 1]
+  H[2, 2] <- (1-alpha)*sum((f2.doubleprime-(1-alpha)*f2.prime^2)/psi)
+  mu.new <- c(mu.old-solve(H)%*%cbind(grad))
+  print(c(mu.new, sum(log(psi))))
+  if(sum(abs(mu.old-mu.new))<0.001) break
+  if(k>10) break
+  mu.old <- mu.new
+}
+```
+
+Or we can make use of R:
+
+
+```{r}
+x <- faithful$Waiting.Time
+fun <- function(mu, alpha=0.355, sigma=c(5.4, 5.9)) {
+  f1 <- dnorm(x, mu[1], sigma[1])
+  f2 <- dnorm(x, mu[2], sigma[2])
+  psi <- alpha*f1+(1-alpha)*f2
+  -sum(log(psi))
+}
+optim(c(50,80), fun)
+```
+
+In fact why not fit for all?
+
+```{r}
+x <- faithful$Waiting.Time
+fun <- function(par) {
+  f1 <- dnorm(x, par[2], par[3])
+  f2 <- dnorm(x, par[4], par[5])
+  psi <- par[1]*f1+(1-par[1])*f2
+  -sum(log(psi))
+}
+optim(c(0.5, 50, 5.4, 80, 5.9), fun)
+```
+
+## EM Algorithm
+
+There is another way to find the mle's in a problem of this kind called the EM or *Expectation-Maximization* algorithm. The idea is as follows. 
+
+Say there were a second variable Z~i~ which is 0 if the next waiting time is a short one and 1 otherwise. Now if we knew those  Z~i~'s it would be easy to estimate the $\mu$'s:
+
+$$
+\hat{\mu_i}=\text{mean}(X|Z=z_i)\\
+\hat{\sigma_i}=\text{sd}(X|Z=z_i)
+$$
+On the other hand if we knew all the means and standard deviations it would also be easy to estimate $\alpha$:
+
+$$
+w_i=\frac{\alpha f_{i,1}}{\psi_i}\\
+\hat{\alpha}=\text{mean}(w_i)
+$$
+The $w_i$ are called the weights. These formulas can be verified easily using probability theory.
+
+This suggests the following algorithm:
+
+-  choose a starting point for the parameters  
+-  find the weights  
+-  find the next estimates of the parameters  
+-  iterate until convergence
+
+
+```{r}
+alpha <- 0.355
+mu <- c(50, 80)
+sigma <- c(5.4, 5.9)
+w <- rep(0, 40)
+k <- 0
+x <- faithful$Waiting.Time
+repeat {
+  k <- k+1
+  psi <- (alpha*dnorm(x, mu[1], sigma[1]) + 
+        (1-alpha)*dnorm(x, mu[2], sigma[2]))
+  w <- alpha*dnorm(x, mu[1], sigma[1])/psi
+  alpha <- mean(w)
+  mu[1] <- sum(w*x)/sum(w)
+  mu[2] <- sum((1-w)*x)/sum(1-w)
+  sigma[1] <- sqrt(sum(w*(x-mu[1])^2)/sum(w)) 
+  sigma[2] <- sqrt(sum((1-w)*(x-mu[2])^2)/sum(1-w))
+  psi1 <- (alpha*dnorm(x, mu[1], sigma[1]) + 
+        (1-alpha)*dnorm(x, mu[2], sigma[2]))
+  cat(round(alpha,4), " ",
+      round(mu, 1), " ",
+      round(sigma, 2), " ",
+      round(sum(log(psi1)), 5), "\n")
+  if(sum(abs(psi-psi1))<0.001) break
+  if(k>100) break
+}
+```
+
+Notice one feature of the EM algorithm: it guarantees that each iteration moves the parameters closer to the mle.
+
+
+`r hl()$hr()`
+
+The EM algorithm was originally invented by Dempster and Laird in 1977 to deal with a common problem in Statistics called *censoring*: say we are doing a study on survival of patients after cancer surgery. Any such study will have a time limit after which we will have to start with the data analysis, but hopefully there will still be some patients who are alive, so we don't know their survival times, but we do know that the survival times are greater than the time that has past sofar. We say the data is censored at time T. The number of patients with survival times >T is important information and should be used in the analysis. If we order the observations into (x~1~, .., x~n~) the uncensored observations (the survival times of those patients that are now dead) and (x~n+1~, .., x~n+m~) the censored data, the likelihood function can be written as
+
+$$
+L(\theta|x)=\left[ 1-F(T|\theta\right]^m\prod_{i=1}^{n}f(x_i|\theta)
+$$
+
+where $F$ is the distribution function of $f$. 
+
+Of course if we knew the survivial times of theose m censored patioents was (z~n+1~, .., z~n+m~) we could write the complete data likelihood:
+
+$$
+L(\theta|x, z)=\prod_{i=1}^{n}f(x_i|\theta)\prod_{i=n+1}^{n+m}f(z_i|\theta)
+$$
+
+This suggests the EM algorithm:
+
+-  in the M step assume you know the z's and estimate $\theta$  
+-  in the E step assume you know $\theta$ and estimate the z's
+
+#### **Example** Censored exponential survival times
+
+Say $X_i \sim Exp(\theta)$, we have data X~1~, .., X~n~ and we know that m observations were censored at T. Now one can find that
+
+$$
+\hat{\theta}=\frac{n+m}{\sum x_i + \sum z_i}\\
+z_i=\frac1{\theta}+T
+$$
+
+```{r}
+em.exp <- function(x, m, T) {
+  theta.old <- 1/mean(x)
+  repeat {
+    z <- rep(1/theta.old+T, m)
+    theta.new <- 1/mean(c(x, z))
+    print(theta.new, 5)
+    if(abs(theta.new-theta.old)<0.0001) break
+    theta.old <- theta.new
+  }
+}
+```
+
+```{r}
+x <- rexp(1000, 0.1)
+1/mean(x)
+em.exp(x, 0, 0)
+x <- x[x<20]
+m <- 1000 - length(x)
+m
+1/mean(x)
+em.exp(x, m, 20)
+x <- x[x<10]
+m <- 1000 - length(x)
+m
+1/mean(x)
+em.exp(x, m, 10)
+```
+

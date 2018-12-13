@@ -1,0 +1,482 @@
+---
+title: Bayesian Analysis
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+Our previous discussions focused on statistical methods that belong to the *Frequentist School*. There is however an entirely different apporach to Statistics called *Bayesian*.
+
+## Prior and Posterior Distribution
+
+Say we have a sample $\textbf{x}=(x_1,..,x_n)$, iid from some probability density $f(.; \theta)$, and we want to do some inference on the parameter $\theta$.
+
+A Bayesian analysis begins by specifying a *prior* distribution $\pi(\theta)$. This prior is supposed to encode our knowledge of the parameter **before** an experiment is done. Then one uses Bayes' formula to calculate the *posterior distribution*:
+
+$$
+f(\theta ; \textbf{x}) = f(\textbf{x}; \theta)\pi(\theta)/m(\textbf{x})
+$$
+
+where $m(\textbf{x})$ is the marginal distribution 
+
+$$
+m(\textbf{x}) = \int ..\int f(\textbf{x}|\theta)\pi(\theta) d \theta
+$$
+
+#### **Example**: Binomial proportion, discrete prior
+
+Let's say that we have two coins. One is a fair coin with $\pi=0.5$ and the other is a loaded coin with $\pi=0.6$. We randomly choose a coin and flip it 100 times. We get 58 heads. What can we say?
+
+Now we have $X \sim Bin(100, \pi)$, or 
+
+$$
+P_\pi(X=58) = \\
+{{100}\choose{58}}\pi^{58}(1-\pi)^{100-58} = \\
+K\pi^{58}(1-\pi)^{42}
+$$
+
+the marginal is found with
+
+$$
+\begin{aligned}
+&m(58)    = \\
+&P_{\pi=0.5}(X=58)P(\pi=0.5)+P_{\pi=0.6}(X=58)P(\pi=0.6)=\\
+&\frac12 \left\{ {{100}\choose{58}}0.5^{58}(1-0.5)^{42} + {{100}\choose{58}}0.6^{58}(1-0.6)^{42}\right\}    = \\
+&{{100}\choose{58}}/2\left\{ 0.5^{100} + 0.6^{58}0.4^{42}\right\}   \\
+\end{aligned}
+$$
+
+and the posterior distribution is given by
+
+$$
+\begin{aligned}
+&P_{X=58}(\pi=0.5)  =  \\
+&\frac{P_{\pi=0.5}(X=58)P(\pi=0.5)}{m(58)}    = \\
+&\frac{{{100}\choose{58}}0.5^{58}(1-0.5)^{42}1/2}{{{100}\choose{58}}/2\left\{ 0.5^{100} + 0.6^{58}0.4^{42}\right\}}    = \\
+&\frac{0.5^{100}}{0.5^{100} + 0.6^{58}0.4^{42}}\\
+\end{aligned}
+$$
+and a similar calculation shows
+
+$$
+\begin{aligned}
+&P_{x=58}(\pi=0.6)  =  \\
+&\frac{0.6^{58}0.4^{42}}{0.5^{100} + 0.6^{58}0.4^{42}}\\
+\end{aligned}
+$$
+or
+
+```{r}
+round(c(0.5^100, 0.6^58*0.4^42)/(0.5^100+ 0.6^58*0.4^42), 4)
+```
+
+and so the probability that this as the fair coin is 0.231.
+
+#### **Example**: Binomial proportion, Uniform prior
+
+Let's assume we have no idea what $\pi$ might be, then a uniform distribution might make good sense as a prior:
+
+$$
+X \sim Bin(n, \pi), \pi \sim U[0,1]
+$$
+
+now we find 
+
+$$
+\begin{aligned}
+&m(x)  = \int_{-\infty}^\infty f(x|\mu)\pi(\mu) d\mu = \\
+&\int_0^1 {{n}\choose{x}}p^x(1-p)^{n-x}1dp =\\
+&K_1\int_0^1 p^{(x+1)-1} (1-p)^{(n-x+1)-1}dp = K_2\\
+\end{aligned}
+$$
+
+
+because this is (up to a constant) a Beta density which will integrate to 1. So
+
+$$
+\begin{aligned}
+&f(\theta; \textbf{x}) = f(\textbf{x};\theta)\pi(\theta)/m(\textbf{x})    = \\
+& K_3  \pi^{(x+1)-1} (1-\pi)^{(n-x+1)-1} \\
+\end{aligned}
+$$
+and we find
+
+$$
+\pi|X=x \sim \text{Beta}(x+1, n-x+1)
+$$
+
+
+```{r}
+n <- 10
+p <- runif(1e5)
+x <-  rbinom(1e5, n, p)
+x0 <- 3
+z <- p[x==x0]
+hist(z, 50, freq=FALSE)
+curve(dbeta(x, x0+1, n-x0+1), -2, 2, add=T)
+```
+
+#### **Example**: Normal mean, normal prior
+
+$X \sim N(\mu, \sigma)$ independent, $\sigma$ known, $\mu \sim N(a, b)$. 
+
+Now
+
+$$
+\begin{aligned}
+&m(x)  = \int_{-\infty}^\infty f(x|\mu)\pi(\mu) d\mu = \\
+&\int_{-\infty}^\infty \frac{1}{\sqrt{2\pi \sigma^2}} e^{ 
+-\frac1{2\sigma^2} (x-\mu)^2 } \frac{1}{\sqrt{2\pi b^2}} e^{ -\frac1{2 b^2} (\mu-a)^2 }  d\mu \\
+\end{aligned}
+$$
+
+Note
+
+$$
+\begin{aligned}
+&(x-\mu)^2/\sigma^2  + (\mu-a)^2/b^2 = \\
+&x^2/\sigma^2 - 2x\mu/\sigma^2 + \mu^2/\sigma^2 + \mu^2/b^2 - 2a\mu/b^2 +a^2/b^2 \\
+&(1/\sigma^2+1/b^2)\mu^2 -2(x/\sigma^2+a/b^2 )\mu + K_1 = \\
+&(1/\sigma^2+1/b^2) \left( \mu^2 -2 \frac{x/\sigma^2+a/b^2}{1/\sigma^2+1/b^2}\mu \right) +K_2 =\\
+&\frac{(\mu-d)^2}{c^2}+K_3
+\end{aligned}
+$$
+
+where $d=\frac{x/\sigma^2+a/b^2}{1/\sigma^2+1/b^2}$ and $c=1/\sqrt{1/\sigma^2+1/b^2}$
+
+therefore
+
+$$
+\begin{aligned}
+&m(x)  = K_4 \int_{-\infty}^\infty e^{ 
+-\frac1{2c^2} (\mu-d)^2 } d \mu= K_5\\
+\end{aligned}
+$$
+
+because the integrand is a normal density with mean d and standard deviation c, so it will integrate to 1 as long as the constants are correct. 
+
+
+$$
+\begin{aligned}
+&f(\theta| \textbf{x}) = f(\textbf{x}|\theta)\pi(\theta)/m(\textbf{x})    = \\
+& K_6 e^{ -\frac1{2c^2} (\mu-d)^2 }   \\
+\end{aligned}
+$$
+Notice that we don't need to worry about what exactly $K_6$ is, because the posterior will be a proper probability density, so $K_6$ will be what it has to be!
+
+So we found
+
+$$
+\mu|X=x \sim N\left(\frac{x/\sigma^2+a/b^2}{1/\sigma^2+1/b^2}, 1/\sqrt{1/\sigma^2+1/b^2}\right)
+$$
+Let's so a little simulation to see whether we got this right:
+
+```{r}
+a <- 0.2 # just as an example
+b <- 2.3
+sigma <- 0.5
+mu <- rnorm(1e5, a, b)
+x <-  rnorm(1e5, mu, sigma)
+x0 <- 0.1
+cc <- 1/sqrt(1/sigma^2 + 1/b^2)
+d <- (x0/sigma^2+a/b^2)/(1/sigma^2 + 1/b^2)
+z <- mu[x>x0-0.05 & x<x0+0.05]
+hist(z, 50, freq=FALSE)
+curve(dnorm(x, d, cc), -2, 2, add=TRUE)
+x0 <- (-1.1)
+d <- (x0/sigma^2+a/b^2)/(1/sigma^2 + 1/b^2)
+z <- mu[x>x0-0.05 & x<x0+0.05]
+hist(z, 50, freq=FALSE)
+curve(dnorm(x,d, cc), -3, 2, add=TRUE)
+```
+
+`r hl()$hr()`
+
+Note that one thing a frequentist and a Bayesian analysis have in common is the likelihood function.
+
+
+## Inference
+
+In a Bayesian analysis any inference is done from the posterior distribution. For example, point estimates can be found as the mean, median, mode or any other measure of central tendency.
+
+Interval estimates (now called credible intervals) can be found using quantiles of the posterior distribution.
+
+
+#### **Example**: Binomial proportion, uniform prior
+
+
+we found the posterior distribution to be
+
+$$
+\pi|X=x \sim \text{Beta}(x+1, n-x+1)
+$$
+From probability theory we know that if $Y \sim \text{Beta}(\alpha, \beta)$ we have $EY=\frac{\alpha}{\alpha+ \beta}$, so here we find $\hat{\pi}=\frac{y+1}{n+2}$. Recall that the frequentist solution (the mle) was $\hat{\pi}=\frac{y}{n}$.
+
+Recall the survey of 567 people, 235 said they prefer Coke over Pepsi. A $95\%$ credible interval for the true proportion is given by
+
+```{r}
+ci <- qbeta(c(0.025, 0.975), 235+1, 567-235+1)
+round(ci, 3)
+```
+
+The frequentist confidence interval was
+
+```{r}
+phat <- 235/567
+round(phat + c(-1, 1)*qnorm(0.975)*sqrt(phat*(1-phat)/567), 3)
+```
+
+and we see the two qre quite close. This tends to be true as long as there is enough data.
+
+
+#### **Example**: Normal mean, normal prior
+
+say the following is a sample $x_1,..,x_n$ from a normal with standard deviation $\sigma=2.3$:
+
+```{r echo=FALSE}
+dta.norm <- sort(round(rnorm(20, 5.4, 2.3), 1))
+```
+
+```{r}
+dta.norm
+```
+
+if we decide to base our analysis on the sample mean we have $\bar X \sim N(\mu, \sigma/\sqrt{n})$. Now if we use the posterior mean we find
+
+$$
+E[\mu|X=x] = \frac{x/\sigma^2+a/b^2}{1/\sigma^2+1/b^2}
+$$
+
+now we need to decide what a and b to use. If we have some prior information we can use that. Say we expect a priori that $\mu=5$, and of course we know $\sigma=2.3$, then  we could use $a=5$ and $b=3$:
+
+```{r}
+d <- (mean(dta.norm)/(2.3^2/20) + 5/3^2)/(1/(2.3^2/20) + 1/3^2)
+round(d, 2)
+```
+
+A 95% credible interval is:
+
+```{r}
+cc <- 1/sqrt(1/(2.3^2/20) + 1/3^2)
+round(qnorm(c(0.025, 0.975), d, cc), 2)
+```
+
+the standard frequentist solution would be
+
+```{r}
+round(mean(dta.norm)+c(-1, 1)*qt(0.975, 12)*2.3/sqrt(20), 2)
+```
+
+#### **Example**: Normal mean, Gamma prior
+
+let's say that $\mu$ is a physical quantity, like the mean amount of money paid on sales. In that case it makes more sense to use a prior that forces $\mu$ to be non-negative. For example we could use $\mu \sim \text{Gamma}(\alpha, \beta)$. However, now we need to find
+
+$$
+\begin{aligned}
+&m(x)  = \int_{-\infty}^\infty \frac{1}{\sqrt{2\pi \sigma^2}} e^{ 
+-\frac1{2\sigma^2} (x-\mu)^2 } 
+\frac1{\Gamma(\alpha)\beta^\alpha}\mu^{\alpha-1} e^{-\mu/\beta}
+d\mu 
+\end{aligned}
+$$
+
+and this integral does not exist. We will have to use numerical methods instead. Let's again find a point estimate based on the posterior mean. As prior we will use $\mu \sim \text{Gamma}(5, 1)$
+
+```{r}
+fmu <- function(mu) 
+  dnorm(mean(dta.norm), mu, 2.3/sqrt(20))*
+  dgamma(mu, 5, 1)
+mx <- integrate(fmu, lower=0, upper=Inf)$value
+posterior.density <- function(mu) fmu(mu)/mx
+posterior.mean <- 
+  integrate(
+    function(mu) {mu*posterior.density(mu)}, 
+    lower = 0, 
+    upper = Inf)$value
+round(posterior.mean, 2)
+```
+
+how about a 95% credible interval? This we need to solve the equations
+
+$$
+F(\mu)=0.025\text{, }F(\mu)=0.975
+$$
+
+where $F$ is the posterior distribution function. Again we need to work numerically. We can use a simple bisection algorithm:
+
+```{r}
+pF <- function(t) integrate(posterior.density, 
+            lower=3, upper=t)$value
+cc <- (1-0.95)/2
+l <- 3
+h <- posterior.mean 
+repeat {
+    m <- (l+h)/2
+    if(pF(m)<cc) l <- m
+    else h <- m
+    if(h-l<m/1000) break
+}
+left.endpoint <- m
+h <- 8
+l <- posterior.mean 
+repeat {
+    m <- (l+h)/2
+    if(pF(m)<1-cc) l <- m
+    else h <- m
+    if(h-l<m/1000) break
+}
+right.endpoint <- m
+round(c(left.endpoint, right.endpoint), 2)
+```
+
+Let's generalize all this and write a routine that will find a point estimate and a $(1-\alpha)100\%$ credible interval for any problem with one parameter:
+
+```{r}
+bayes.credint <- function(x, df, prior, conf.level=0.95, acc=0.001,
+          lower, upper,  Show=TRUE) {
+  if(any(c(missing(lower), missing(upper))))
+    cat("Need to give lower and upper boundary\n")
+  posterior.density <- function(par, x) {
+    y <- 0*seq_along(par)
+    for(i in seq_along((par)))
+      y[i] <- df(x, par[i])*prior(par[i])/mx
+    y
+  }
+  mx <- 1
+  mx <- integrate(posterior.density, 
+          lower=lower, upper=upper, x=x)$value
+  if(Show) {
+     par <- seq(lower, upper, length=250)
+     y <- posterior.density(par, x)
+     plot(par, y, type="l")
+  }
+  f.expectation <- function(par, x) par*posterior.density(par, x)
+  parhat <- integrate(f.expectation, 
+              lower=lower, upper=upper, x=x)$value
+  if(Show) abline(v=parhat)
+  pF <- function(t, x) integrate(posterior.density, 
+            lower=lower, upper=t, x=x)$value 
+  cc <- (1-conf.level)/2
+  l <- lower
+  h <- parhat 
+  repeat {
+    m <- (l+h)/2
+    if(pF(m, x)<cc) l <- m
+    else h <- m
+    if(h-l<acc*m) break
+  }
+  left.endpoint <- m
+  h <- upper
+  l <- parhat 
+  repeat {
+    m <- (l+h)/2
+    if(pF(m, x)<1-cc) l <- m
+    else h <- m
+    if(h-l<acc*m) break
+  }
+  right.endpoint <- m
+  if(Show) abline(v=c(left.endpoint, right.endpoint))
+  c(parhat, left.endpoint, right.endpoint)
+}
+```
+
+#### **Example**: Normal mean, normal prior 
+
+```{r}
+df <- function(x, par) dnorm(x, par, 2.3/sqrt(20))
+prior <- function(par) dnorm(par, 5, 2.3)
+round(bayes.credint(mean(dta.norm), df=df, prior=prior,
+      lower=3, upper=8, Show=T), 2)
+```
+
+#### **Example**: Normal mean, Gamma prior 
+
+```{r}
+df <- function(x, par) dnorm(x, par, 2.3/sqrt(20))
+prior <- function(par) dgamma(par, 5, 1)
+round(bayes.credint(mean(dta.norm), df=df, prior=prior,
+      lower=4, upper=7, Show=TRUE), 2)
+```
+
+#### **Example**: Binomial proportion, Lincoln's hat prior
+
+Say we pick a coin from our pocket. We flip it 1000 time and get 578 heads. We want to find a 95% credible interval for the proportion of heads. 
+
+What would be good prior here? We might reason as follows: on the one had we are quite sure that indead it is an "almost" fair coin. On the other hand if it is not a fair coin we really don't know how unfair it might be. We can encode this in the *Lincoln's hat* prior:
+
+```{r}
+prior <- function(x) dunif(x) + dunif(x, 0.45, 0.55)
+curve(prior, 0, 1, ylim=c(0, 11))
+```
+
+```{r}
+df <- function(x, par) dbinom(x, 1000, par)
+round(bayes.credint(x=578, df=df, prior=prior, acc=0.0001,
+      lower=0.5, upper=0.65, Show=TRUE), 3)
+```
+
+
+So, have we just solved the Bayesian estimation problem for one parameter? 
+
+#### **Example**:  Beta density, Gamma prior
+
+consider the following sample:
+
+```{r}
+dta.beta1 <- round(rbeta(100, 2, 2), 3)
+hist(dta.beta1, 50)
+```
+
+Let's say we know that this is from a Beta(a, a) distribution and we want to estimate a. As a prior we want to use Gamma(2, 1)
+
+Now what is df? Because this is an independent sample we find 
+$$
+f(x, a) = \prod_{i=1}^n \text{dbeta}(x_i, a, a)
+$$
+so 
+
+```{r}
+df <- function(x, par) prod(dbeta(x, par, par))
+prior <- function(par) dgamma(par, 2, 1)
+round(bayes.credint(dta.beta1, df=df, prior=prior,
+      lower=1.5, upper=2.5, Show=TRUE), 2)
+```
+
+so far, so good. But now
+
+```{r error=TRUE}
+dta.beta2 <- round(rbeta(10000, 2, 2), 3)
+bayes.credint(dta.beta2, df=df, prior=prior,
+      lower=1.5, upper=2.5, Show=FALSE)
+```
+
+Why does this not work? The problem is that the values is $\prod_{i=1}^n \text{dbeta}(x_i, a, a)$ get so small that R can't handle them anymore!
+
+Occasionally one can avoid this problem by immediately choosing a *statistic* T(x), aka a function of the data, so that T(X) has a distribution that avoids the product. That of course is just what we did above by going to $\bar X$ in the case of the normal! In fact, it is also what we did in the case of the Binomial, because we replace the actual data (a sequence of Bernoulli trials) with their sum. It is however not clear what one could use in the case of the Beta distribution.
+
+`r hl()$hr()`
+
+Can we generalize this to more than one parameter? In principle yes, but in practise no, at least not if the number of parameters is much more than 3 or 4. The main problem is the calculation of the marginal $m(x)$, because numerical integration in higher-dimensional spaces is very difficult. In that case a completley different approach is used, namely sampling from the posterior distribution using so called MCMC (Markov Chain Monte Carlo) algorithms.
+
+Another difficulty arises in the choice of priors. There are a number of different approaches known for low-dimensional problems, however these can fail badly in higher dimensions.
+
+`r hl()$hr()`
+
+There are a number of R packages that allow Bayesian analysis, such as JAGS, OpenBUGS, WinBUGS and Stan. However, we don't have enough time to discuss these. 

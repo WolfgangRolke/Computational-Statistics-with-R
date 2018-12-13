@@ -1,0 +1,208 @@
+---
+title: Descriptive Statistics 
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+library(wolfr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+options(scipen = 999)
+```
+`r hl()$basefontsize()`
+
+In general in Statistics we distinguish between quantitative (= numerical) and categorical (= qualitative) data. The main difference is that for quantitative data doing arithmetic makes sense, for example calculating the mean. 
+
+Note that just because a data set has digits, it is not necessarily quantitative. For example, digits are often used as labels.
+
+## Basic Summaries and Graphs
+
+Consider the **upr admissions** data. Here are some simple things to do when looking at this kind of data:
+
+### Tables
+
+```{r}
+Gender <- table(upr$Gender)
+names(Gender) <- c("Female", "Male")
+Percentage <- round(Gender/sum(Gender)*100, 1)
+cbind(Gender, Percentage)
+```
+
+```{r echo=FALSE}
+rm(Gender)
+rm(Percentage)
+```
+
+### Contingency Tables
+
+```{r}
+tbl <- table(upr$Gender, upr$Class.Facultad)
+tbl
+```
+
+In a contingency table percentages can be calculated in three ways:
+
+
+```{r}
+# overall total
+ot <- sum(tbl)
+ot
+# row total
+rt <- apply(tbl, 1, sum)
+rt
+# column total
+ct <- apply(tbl, 2, sum)
+ct
+```
+
+-  by grand total
+
+```{r}
+tmp <- cbind(tbl, Total=rt)
+tmp <- rbind(tmp, Total=c(ct, sum(ct)))
+round(tmp/ot*100, 1)
+```
+
+-  by row total
+
+```{r}
+round(tmp/c(rt, ot)*100, 1)
+```
+
+-  by column total
+
+```{r}
+t(round(t(tmp)/c(ct, ot)*100, 1))
+```
+
+### Bar Charts
+
+```{r}
+ggplot(upr, aes(Class.Facultad)) + 
+  geom_bar(alpha=0.75, fill="lightblue") +
+  xlab("")
+ggplot(upr, aes(Class.Facultad, fill=Gender)) + 
+  geom_bar(position="dodge", alpha=0.75) 
+```
+
+as with the tables, graphs can be done based on percentages:
+
+-  grand total
+
+```{r}
+ggplot(upr, aes(Class.Facultad, fill=Gender)) + 
+  geom_bar(aes(y = (..count..)/sum(..count..)),
+           position="dodge", 
+           alpha=0.75) 
+```
+
+-  row total
+
+this one we have to work a bit:
+
+```{r}
+tmp1 <- c(tmp[1, 1:5], tmp[2, 1:5])/c(rt, rt)*100
+df <- data.frame(Percentage = tmp1,
+                 Gender=rep(c("Female", "Male"), 5),
+                 Class=names(tmp1))
+ggplot(df, aes(x = Class, 
+               y = Percentage,
+               fill = Gender)) + 
+    geom_bar(position = "dodge",
+             stat = "identity") 
+```
+
+Notice the use of *stat="identity"* if the data is already in the form of a table.
+
+### Numerical Summaries
+
+```{r error=TRUE}
+round(mean(upr$Freshmen.GPA), 3)
+```
+
+we get an error because there are missing values, so 
+
+```{r}
+round(mean(upr$Freshmen.GPA, na.rm=TRUE), 3)
+round(median(upr$Freshmen.GPA, na.rm=TRUE), 3)
+round(sd(upr$Freshmen.GPA, na.rm=TRUE), 3)
+round(quantile(upr$Freshmen.GPA, 
+               probs = c(0.1, 0.25, 0.75, 0.9),
+               na.rm=TRUE), 3)
+```
+
+### Histogram and Boxplot
+
+```{r}
+bw <- diff(range(upr$Freshmen.GPA, na.rm = TRUE))/50 # use about 50 bins
+ggplot(upr, aes(Freshmen.GPA)) +
+  geom_histogram(color = "black", 
+                 fill = "white", 
+                 binwidth = bw) + 
+  labs(x = "Freshmen GPA", y = "Counts")
+```
+
+```{r}
+ggplot(upr, aes(x="", y=Freshmen.GPA)) + 
+  geom_boxplot() + 
+  xlab("")
+ggplot(upr, aes(factor(Year), Freshmen.GPA)) + 
+  geom_boxplot() 
+```
+
+### Two Quantitative Variables
+
+```{r}
+round(cor(upr$Year, upr$Freshmen.GPA, 
+    use="complete.obs"), 3)
+ggplot(upr, aes(Year, Freshmen.GPA)) + 
+  geom_jitter(shape=".", width=0.1, height = 0) +
+  scale_x_continuous(breaks = 2003:2013) +
+  labs(x="Year", y="GPA after Freshmen Year")
+```
+
+## Normal Probability Plot
+
+An important graph is the *normal probability plot*, which plots the sample quantiles vs the population quantiles of a normal distribution:
+
+```{r}
+x <- rnorm(20)
+df <- data.frame(x=x)
+y1 <- quantile(x, c(0.25, 0.75))
+x1 <- qnorm(c(0.25, 0.75))
+slope <- diff(y1)/diff(x1)
+int <- y1[1L] - slope * x1[1L]
+ggplot(df, aes(sample=x)) +
+  stat_qq() +
+  geom_abline(slope = slope, intercept = int, color="blue")
+```
+
+Notice that adding the customary line through the quartiles takes a bit of work.
+
+Here an example where the normal assumption fails:
+
+```{r}
+x <- rexp(20)
+df <- data.frame(x=x)
+y1 <- quantile(x, c(0.25, 0.75))
+x1 <- qnorm(c(0.25, 0.75))
+slope <- diff(y1)/diff(x1)
+int <- y1[1L] - slope * x1[1L]
+ggplot(df, aes(sample=x)) +
+  stat_qq() +
+  geom_abline(slope = slope, intercept = int, color="blue")
+```
+

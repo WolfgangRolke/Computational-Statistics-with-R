@@ -1,0 +1,157 @@
+---
+title: Classification Trees
+header-includes: \usepackage{color}
+output:
+  pdf_document:
+    fig_caption: no
+  html_document: default
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+
+```{r echo=FALSE}
+source("R/classification.R")
+```
+
+regression trees work very well for classification problems as well:
+
+
+```{r}
+library(rpart)
+df <- gen.ex(1)
+df1 <- make.grid(df)
+fit <- rpart(group~., data=df[, 1:3], method = "class")
+df1$group <- predict(fit, df1[, 1:2], type="class")
+do.graph(df, df1)
+```
+
+
+```{r}
+df <- gen.ex(2)
+fit <-rpart(group~., data=df[, 1:3], method = "class")
+df1 <- make.grid(df)
+df1$group <- predict(fit, df1[, 1:2], type="class")
+do.graph(df, df1)
+```
+
+
+```{r}
+df <- gen.ex(3)
+fit <- rpart(group~., data=df[, 1:3], method = "class")
+df1 <- make.grid(df)
+df1$group <- predict(fit, df1[, 1:2], type="class")
+do.graph(df, df1)
+```
+
+
+## Better Trees
+
+There are a number of ways to improve the performance of tree based methods. These are
+
+-  bagging (bootstrap aggregation)
+-  random forests  
+
+
+Both start with the same idea: take a random part of the data, fit a tree to it and use that for prediction. Then repeat this a number of times. Finally do the prediction by averaging.
+
+### Bagging
+
+As the name suggests, here we apply the tree method to bootstap samples.
+
+```{r cache=TRUE}
+df <- gen.ex(1, n=50)[, 1:3]
+n <- dim(df)[1]
+L_tree <- list(1:100)
+for(i in 1:100){
+  I <- sample(1:n, size=n, replace=TRUE)
+  L_tree[[i]] <- rpart(factor(group)~., data=df[I, ])
+}
+```
+
+the aggregation is done by averaging:
+
+```{r}
+df1 <- make.grid(df) 
+tmp <- predict(L_tree[[1]], df1)
+df1$group <- ifelse(tmp[, 1]<0.5, "B", "A")
+do.graph(df, df1)
+for(i in 2:100)
+  tmp <- tmp + predict(L_tree[[i]], df1)
+df1$group <- ifelse(tmp[, 1]<50, "A", "B")
+do.graph(df, df1)
+```
+
+alternatively we can predict the class directly and use majority rule:
+
+
+```{r error=T,cache=TRUE}
+df <- gen.ex(2, n=50)[, 1:3]
+n <- dim(df)[1]
+L_tree <- list(1:100)
+for(i in 1:100){
+  I <- sample(1:n, size=n, replace=TRUE)
+  L_tree[[i]] <- rpart(factor(group)~., data=df[I, ],
+                       method = "class")
+}
+df1 <- make.grid(df) 
+tmp <- matrix(nrow=10000, ncol=100)
+for(i in 1:100)
+  tmp[, i] <- predict(L_tree[[i]], df1, type="class")
+df1$group <- ifelse(
+  apply(tmp, 1, function(x) {sum(x==2)<50}), 
+        "A", "B")
+
+do.graph(df, df1)
+```
+
+### Random Forests
+
+The major idea of random forrests is that we only consider a random subset of predictors m each time we do a split on training examples. Whereas usually in trees we find all the predictors while doing a split and choose best amongst them. Typically $m=\sqrt p$ where p are the number of predictors.
+
+Now it seems crazy to throw away lots of predictors, but it makes sense because the effect of doing so is that each tree uses different predictors to split data at various times. This means that two trees generated on the  same training data will have randomly different variables selected at each split, hence this is how the trees will get de-correlated and will be independent of each other.
+
+Another great thing about random forests and bagging is that we can keep on adding more and more big bushy trees and that won’t hurt us because at the end we are just going to average them out which will reduce the variance by the factor of the number of Trees T itself.
+
+So by doing this trick of throwing away predictors, we have de-correlated the Trees and the resulting average seems a little better.
+
+Here is how it works in R
+
+```{r}
+library(randomForest)
+df <- gen.ex(1)[, 1:3]
+fit <- randomForest(factor(group)~., data=df)
+df1 <- make.grid(df)
+df1$group <- predict(fit, df1)
+do.graph(df, df1)
+```
+
+
+```{r}
+df <- gen.ex(2)[, 1:3]
+fit <- randomForest(factor(group)~., data=df)
+df1 <- make.grid(df)
+df1$group <- predict(fit, df1)
+do.graph(df, df1)
+```
+
+```{r}
+df <- gen.ex(3)[, 1:3]
+fit <- randomForest(factor(group)~., data=df)
+df1 <- make.grid(df)
+df1$group <- predict(fit, df1)
+do.graph(df, df1)
+```

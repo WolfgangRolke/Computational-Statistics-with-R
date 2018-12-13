@@ -1,0 +1,456 @@
+---
+title: Nonparametric Regression, Smoothing
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+library(wolfr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+Consider the following graph:
+
+```{r}
+ggplot(wine, 
+       aes(Wine.Consumption, Heart.Disease.Deaths)) +
+  geom_point() +
+  geom_smooth(se=FALSE)
+```
+
+Notice that this is the default of geom_smoooth, if you want the least squares line you need to use the argument method="lm".
+
+What is this curve?
+
+A completely different approach to fitting non-linear problems is via local and non-parametric regression. Say we have a model of the form $y=f(x)$ for some function $f$, and we want to estimate $y_0=f(x_0)$. In this type of fitting procedure $y_0$ is estimated using only x values close to $x_0$, or at least the contribution of x values close to $x_0$ is weighted more heavily than others.
+
+One popular method for smoothing is the function *loess*. It works as follows:
+
+1) Find the k nearest neighbors of $x_0$, which constitute a neighborhood $N(x_0)$. The number of neighbors k is specified as a percentage of the total number of points in the dataset. This percentage is called the span and is a tuning parameter of the method.
+
+2) Calculate the largest distance $D(x_0)$ between $x_0$ and another point in the neighborhood.
+
+3) Assign weights to each point in $N(x_0)$ using the tri-cube weight function:
+
+$$
+\begin{aligned}
+&W(\frac{x_0-x_1}{\Delta(x_0)} )  
+\end{aligned}
+$$
+where
+
+$$
+W(u)=(1-u^3)^3 I_{[0,1]}(u)
+$$
+4) Calculate the weighted least squares fit of $x_0$ on the neighborhood $N(x_0)$. 
+
+As we saw above, when it is supposed to be added to a ggplot it is easily done with the geom_smooth() command. The span can be changed with
+
+
+```{r}
+ggplot(wine, 
+       aes(Wine.Consumption, Heart.Disease.Deaths)) +
+  geom_point() +
+  geom_smooth(se=FALSE, span=0.3, color="green") +
+  geom_smooth(se=FALSE) +
+  geom_smooth(se=FALSE, span=1.3, color="red") 
+```
+
+so a larger value of span leads to a smoother curve. The default is 0.75.
+
+To get actual predictions do this:
+
+```{r}
+fit <- loess(Heart.Disease.Deaths~Wine.Consumption,
+          data=wine)
+predict(fit, data.frame(Wine.Consumption=5))
+```
+
+There are a number of nonparametric regression methods implemented in R:
+
+-  **ksmooth** finds the *Nadaraya-Watson* kernel regression estimate, which is of the form
+
+$$
+\hat{y}_i=\frac{\sum_{j=1}^{n}y_iK(\frac{x_i-x_j}{h})}{\sum_{j=1}^{n}K(\frac{x_i-x_j}{h})}
+$$
+ 
+here $K$ is the kernel function, usually one of the following:
+
+-  Normal density: $K(x)=\frac1{\sqrt{2 \pi}}\exp (-\frac12 x^2)$
+
+-  Tukey's Biweight: $K(x)=\frac{15}{16}(1-x^2)^2I_{[0,1]}(x)$
+
+-  Epanechnikov: $K(x)=\frac{3}{4}(1-x^2)I_{[0,1]}(x)$ 
+
+and $h$ is the equivalent to *span* in loess, a tuning parameter.
+
+-  **smooth.spline** fits a *cubic smoothing spline*.
+
+Splines are smooth piecewise polynomial functions often used in numerical analysis. Cubic splines specifically use polynomials up to degree 3. The cubic functions change at points called *knots* and are chosen such that the whole function is continuous.
+
+Let's consider the following artificial example: we generate some data, using the model
+
+$$
+\begin{aligned}
+&y=5-2x+0.35x^2-0.01x^3 \text{, } x<5 \\
+&y=2.5 \text {, } x>5 
+\end{aligned}
+$$
+```{r}
+x <- sort(runif(100, 0, 10))
+df <- data.frame(x=x,
+     y=ifelse(x<5, 5-2*x+0.35*x^2-0.01*x^3, 2.5)+ 
+     rnorm(100, 0, 0.25))
+plt <- ggplot(df, aes(x, y)) + geom_point()
+newx <- seq(0, 10, length=100)
+df.true <- data.frame(x=newx,
+     y=ifelse(newx<5, 
+              5-2*newx+0.35*newx^2-0.01*newx^3, 2.5))
+plt + geom_line(data=df.true,  aes(x, y))
+```
+
+we wish to fit cubic splines to the dataset. That is we fit a model of the form
+
+$$
+y=\alpha_{0j}+\alpha_{1j}x+\alpha_{2j}x^2+\alpha_{3j}x^3
+$$
+if $x_{j-1}<x<x_j$ (with $x_0=-\infty$ and $x_{k+1}=\infty$). Here the $x_j$ are the *knots*. Sometimes these are also estimated from the data, but for now we keep it simple and assume we know $k=1$ and $x_1=5$. 
+
+We want to estimate the $\alpha_{ij}$ via least squares but with the condition that the resulting function be continuous, which results in the condition
+
+$$
+\alpha_{0j}+\alpha_{1j}x_j+\alpha_{2j}x_j^2+\alpha_{3j}x_j^3 = \\
+\alpha_{0j+1}+\alpha_{1j+1}x_j+\alpha_{2j+1}x_j^2+\alpha_{3j+1}x_j^3
+$$
+
+In general such *conditional optimization* problems can be solved with methods such as *Lagrange Multipliers*, but we don't need to worry about that, the routine *smooth.spline* takes care of it for us:
+
+```{r}
+fit <- smooth.spline(df$x, df$y, spar = 0.8)
+df1 <- data.frame(predict(fit, 
+        data.frame(x = seq(0, 10, length = 100))))
+colnames(df1)[2] <- "y"
+df1 <- rbind(df1, df.true)
+df1$Which <- rep(c("Spline", "True"), each=100)
+plt + geom_line(data=df1, aes(x, y, color=Which),
+                size=1.2)
+```
+
+There is one drawback of this solution: it does not allow us to specify the exact location of the knot. Here is how to do this: first we introduce a new variable: $z=x-5$ if $x>5$ and 0 otherwise. Next we use *lm* to fit the model
+
+$$
+y=\gamma_{0}+\gamma_{1}x+\gamma_{2}x^2+\gamma_{3}x^3 +\\
+\gamma_{4}z+\gamma_{5}z^2+\gamma_{6}z^3
+$$
+it is easy to see how to recover the $\alpha's$ from this fit.
+
+```{r error=T}
+x <- df$x
+z <- ifelse(x < 5, 0, x - 5)
+x2 <- x^2
+x3 <- x^3
+z2 <- z^2
+z3 <- z^3
+fit <- lm(df$y ~ x + x2 + x3 + z + z2 + z3)
+g <- coef(fit)
+a <- g[1:4]
+b <- c(g[1] - g[5] * 5 + g[6] * 5^2 - g[7] * 5^3, g[2] + 
+            g[5] - 2 * g[6] * 5 + 3 * g[7] * 5^2, g[3] +
+         g[6] - 3 * g[7] * 5, g[4] + g[7])
+print(rbind(a, b))
+y <- rep(0, 100)
+y[x <= 5] <- a[1] + a[2] * x[x <= 5] +
+  a[3] * x[x <= 5]^2 + a[4] * x[x <= 5]^3
+y[x > 5] <- b[1] + b[2] * x[x > 5] + b[3] * 
+          x[x > 5]^2 + b[4] * x[x > 5]^3
+df.tmp <- data.frame(x=x, y=y, Which=rep("lm", 100))
+df1 <- rbind(df1, df.tmp)
+plt + geom_line(data=df1, aes(x, y, color=Which),
+            size=1.1)
+```
+
+Finally, let's add the loess and the ksmooth solutions as well:
+
+```{r}
+x <- seq(0, 10, length = 100)
+fit <- loess(y~x, data=df)
+df.loess <- data.frame(x=x, 
+                 y=predict(fit, data.frame(x = x)),
+                 Which=rep("loess", 100))
+df.ksmooth <- data.frame(x=x, 
+                 y=ksmooth(df$x, df$y, bandwidth = 2)$y,
+                 Which=rep("ksmooth", 100))
+df1 <- rbind(df1, df.loess, df.ksmooth)
+plt + geom_line(data=df1, aes(x, y, color=Which))
+```
+
+Notice the different ways theses methods are called, mostly due to history of how and by whom they were added to R.
+
+In general the choice of method is less important than the choice of:
+
+## Bandwidth (Smoothing Parameter)
+
+One of the most active research areas in Statistics in the last 20 years has been the search for a method to find the "optimal" bandwidth for a smooother. There are now a great number of methods to do this, unfortunately non of them is fully satisfactory. We will briefly look at one method which is one of the main contenders: *cross-validation*.
+
+In order to find an "optimal" solution we need to first decide what "optimal" means. Here we will consider the MISE (mean integrated square error):
+
+$$
+\text{MISE }=E \left[]
+\int ||\hat{f}(x;b)-f(x;b)||^2
+\right]dx
+$$
+Of course ths MISE depends on the unknown function f, and so we need to estimate it from the data. This is done via cross-validation, that is using the observations $(x_1, y_1)$, .., $(x_{i-1},y_{i-1})$, $(x_{i+1},y_{i+1})$, .., $(x_n,y_n)$ to fit the curve at $x_i$ and get an estimate of $y_i$. Then you do this for all i and average over the error.
+
+This specific description is often called *leave-one-out cross-validation*, for obvious reasons. One problem of this method is that for large datasets it is very computationally demanding.
+
+cross-validation is already implemented in R for one of the smoothers, namely smooth.spline. If we do not specify a bandwith (spar or df) the routine will invoke the cross-validation procedure and choose the bandwidth automatically. 
+
+```{r}
+fit <- smooth.spline(df$x, df$y)
+df2 <- data.frame(predict(fit, 
+        data.frame(x = seq(0, 10, length = 100))))
+colnames(df2)[2] <- "y"
+plt + geom_line(data=df2, aes(x, y), 
+                color="blue", size=1.2)
+```
+
+#### **Example**: Lunatics
+
+Let's implement leave-one-out cross-validation for the loess method and apply it to the lunatics data:
+
+```{r error=TRUE}
+cr <- function(df, span) {
+  n <- dim(df)[1]
+  x <- df[[1]]
+  y <- df[[2]]
+  eps <- rep(0, n)
+  for(i in 1:n) {
+    fit <- loess(y[-i]~x[-i], span=span, surface="direct")
+    yhat <- predict(fit, x[i])
+    eps[i] <- (y[i]-yhat)^2
+  }
+  mean(eps)
+}
+```
+
+```{r cache=TRUE}
+span <- seq(0.6, 2, length=25)
+eps <- span
+for(i in 1:25) {
+  eps[i] <- cr(lunatics[, 3:4], span[i])
+}
+
+```
+
+```{r}
+ggplot(data=data.frame(span=span, epsilon=eps),
+       aes(span, epsilon)) +
+  geom_line()
+```
+
+```{r}
+span.cr <- span[eps==min(eps)]
+span.cr
+fit <- loess(Percent.at.Home~Distance, span=span.cr,
+             data = lunatics[-13, ],
+             surface="direct")
+fit1 <- loess(Percent.at.Home~Distance, span=0.75,
+             data = lunatics[-13, ],
+             surface="direct")
+x <- 0:100
+y <- c(predict(fit, x), predict(fit1, x))
+df <- data.frame(x=c(x, x), y,
+          span=rep(c("cr", "default"), each=101))
+ggplot(data=lunatics,
+            aes(Distance, Percent.at.Home)) +
+  geom_point() +
+  geom_line(data=df,  aes(x, y, color=span),
+            inherit.aes = FALSE)
+```
+
+and we see that the smoother curve looks better.
+
+### Interval Estimation
+
+How do we do interval estimation when using loess? As with the predict method for lm we can again get an estimate of the standard error by including *se=TRUE*. However, the predict command for loess does not have an  *interval"* argument. So how do we know whether these are confidence or prediction intervals?
+
+Let's find out. For this we do a little simulation study. We generate 100 x uniform on [0,10] and then 100 y=10+3x+N(0,3). We fit the loess model (using span=0.75) and predict yhat at x=5.0, then we do the same using lm.
+
+```{r cache=TRUE}
+B <- 1000
+se.loess = rep(0, B)
+se.lm = rep(0, B)
+for (i in 1:B) {
+  x <- runif(100, 0, 10)
+  y <- 10 + 3 * x + rnorm(100, 0, 3)
+  se.loess[i] <-  predict(loess(y ~ x), 
+                      newdata = data.frame(x = 5), 
+                      se = TRUE)$se.fit
+  se.lm[i] <- predict(lm(y ~ x), 
+                      newdata = data.frame(x = 5), 
+                      se = TRUE)$se.fit
+}
+cat("loess  error: ", sd(se.loess), "\n")
+cat("lm  error: ", sd(se.lm), "\n")
+```
+
+
+We see that the errors in loess are larger (with a larger standard deviation) than those of lm. This to be expected, after all we are using a lot more information in lm, namely the exact model for the data and the exact distribution of the residuals. 
+
+Notice also that 
+
+```{r}
+out <- predict(lm(y ~ x), newdata = data.frame(x = 5), 
+       se = TRUE, interval="confidence")
+round(out$fit[2:3], 1)
+round(out$fit[1]+c(-1, 1)*qnorm(0.975)*out$se.fit, 1)
+```
+
+so we see that these errors give us confidence intervals. But what if we want prediction intervals?
+
+We have the following equations for the errors:
+
+$$
+\begin{aligned}
+&se_{fit}    = \hat{\sigma}\sqrt{\frac1n + \frac{(x-\bar{x})^2}{s_{xx}} } \\
+&se_{pred}    = \hat{\sigma}\sqrt{1+\frac1n + \frac{(x-\bar{x})^2}{s_{xx}} } \\
+\end{aligned}
+$$
+where $s_{xx}$ is the sum of squares and $\hat{\sigma}$ is an estimate of the standard deviation. It is part of the fit object with *as.numeric(fit[5])*. So
+
+$$
+\begin{aligned}
+& \frac1n + \frac{(x-\bar{x})^2}{s_{xx}}   = 
+\frac{se_{fit}}{\hat{\sigma}^2} \\
+&se_{pred}    = \hat{\sigma}\sqrt{1+
+\frac{se_{fit}^2}{\hat{\sigma}} } = \sqrt{\hat{\sigma}^2+se_{fit}^2 }\\
+\end{aligned}
+$$
+
+and so we can find prediction intervals with
+
+```{r}
+fit <- loess(y ~ x)
+yhat <- predict(fit)
+sighat <- as.numeric(fit[5])
+out <- predict(fit, 
+                newdata = data.frame(x = 5), 
+                se = TRUE)
+se.pred <- sqrt(sighat^2 + out$se.fit^2)
+round(out$fit[1]+c(-1, 1)*qnorm(0.975)*se.pred, 1)
+```
+
+#### **Example**: Lunatics
+
+Find a $90\%$ prediction interval for the Percent.at.Home if the distance is 25miles, using the optimal span.
+
+```{r}
+fit <- loess(Percent.at.Home~Distance, span=span.cr,
+             data = lunatics[-13, ],
+             surface="direct")
+sighat <- as.numeric(fit[5])
+out <- predict(fit, 
+                newdata = data.frame(Distance = 25), 
+                se = TRUE)
+se.pred <- sqrt(sighat^2 + out$se.fit^2)
+round(out$fit[1]+c(-1, 1)*qnorm(0.95)*se.pred, 1)
+```
+
+### Confidence Bands
+
+Let's have another look at geom_smooth:
+
+```{r}
+ggplot(data=lunatics[-13, ],
+            aes(Distance, Percent.at.Home)) +
+  geom_point() +
+  geom_smooth(span=span.cr)
+```
+
+what is this gray band? It is a shaded area between the lower and the upper $95\%$ confidence intervals. We can recreate it ourselves:
+
+```{r}
+fit <- loess(Percent.at.Home~Distance, span=span.cr,
+             data = lunatics[-13, ],
+             surface="direct")
+x <- 1:99
+out <- predict(fit, 
+                newdata = data.frame(Distance = x), 
+                se = TRUE)
+low <- out$fit-qnorm(0.975)*out$se.fit
+high <- out$fit+qnorm(0.975)*out$se.fit
+df.low <- data.frame(x=x, y=low)
+df.high <- data.frame(x=x, y=high)
+ggplot(data=lunatics[-13,],
+            aes(Distance, Percent.at.Home)) +
+  geom_point() +
+  geom_smooth(method="loess", span=span.cr) +
+  geom_line(data=df.low, aes(x, y), color="red")+
+  geom_line(data=df.high, aes(x, y), color="red")
+```
+
+almost, except that geom_smooth does some additional adjustments. We won't worry about that for now.
+
+How about if we want the bands to show prediction intervals?
+
+```{r}
+sighat <- as.numeric(fit[5])
+se.pred <- sqrt(sighat^2 + out$se.fit^2)
+low <- out$fit-qnorm(0.975)*se.pred
+low[low<0] <- 0
+high <- out$fit+qnorm(0.975)*se.pred
+high[high>100] <- 100
+df.low <- data.frame(x=x, y=low)
+df.high <- data.frame(x=x, y=high)
+ggplot(data=lunatics[-13,],
+            aes(Distance, Percent.at.Home)) +
+  geom_point() +
+  geom_line(data=df.low, aes(x, y), color="red")+
+  geom_line(data=df.high, aes(x, y), color="red")
+```
+
+or a bit nicer:
+
+```{r}
+df1 <- data.frame(x, ymin=low, ymax=high)
+ggplot(data=lunatics[-13,],
+            aes(Distance, Percent.at.Home)) +
+  geom_point() +
+  geom_ribbon(data=df1, 
+              aes(x=x, ymin=ymin, ymax=ymax),
+              alpha=0.2,
+              inherit.aes = FALSE)
+```
+
+There is however an issue with these bands. From our recreation it is clear that they are *pointwise* confidence intervals, that is each is a $95\%$ confidence interval for each x value. However, psychologically most people will look at them and interpret them as *simultaneous* confidence bands. That is, the $95\%$ applies to the collection of intervals, not each interval alone. 
+
+Say we have $n$ data points, and we find a $(1-\alpha)100\%$ confidence interval at each. If they are all independent we find
+
+$$
+\begin{aligned}
+&P( \text{at least one interval is wrong})    = \\
+&1-P( \text{no interval is wrong})    = \\
+&1-P\left( \cap_{k=1}^n I_k \text{ is right} \right)    = \\
+&1-\prod_{k=1}^nP\left(  I_k \text{ is right} \right)    = \\
+&1-\prod_{k=1}^n(1-\alpha)=1-(1-\alpha)^n
+\end{aligned}
+$$
+and this goes to 1 as n grows larger. 
+
+To make matters worse, in a regression case intervals at neighboring points are clearly not independent, so we don't even know what the true simultaneous coverage might be. 
+
+Personally I am very reluctant to add such bands to graphs, but they are quite popular in many fields.

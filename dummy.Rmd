@@ -1,0 +1,432 @@
+---
+title: Models with dummy variables
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+#### **Example**: Environmental, Safety and Health Attitudes
+
+Environment, Safety and Health Attitudes of employees of a laboratory. Employees are given a questionaire, which is then collated into an average score from 1(bad) to 10(good). We also have available the length of service of the employee and their gender.
+
+```{r}
+head(esh)
+```
+
+One of the predictor variables (Sex) is actually categorical. A  categorical variable used in a regression model is often refered to as a *dummy* variable.
+
+Let's start by looking at each predictor separately.
+
+- Years is quantitative, so do the scatterplot:
+
+```{r}
+attach(esh)
+```
+
+
+```{r}
+ggplot(data=esh, aes(Yrs.Serv, ES.H)) + 
+    geom_point() +
+  geom_smooth(method = "lm", se=FALSE)
+```
+
+- Sex is categorical, so do the boxplot:
+
+```{r}
+ggplot(data=esh, aes(Sex, ES.H)) + 
+    geom_boxplot()
+```
+
+The values in Sex (Male, Female) are text but in a regression we need everything to be numeric, so in order to use Sex in a regression model we first have to *code* the variable as numbers, for example Female=0 and Male=1. Then
+
+```{r}
+SexCode <- rep(0, length(Sex))
+SexCode[Sex=="Male"] <- 1
+esh1 <- data.frame(ESH=esh$ES.H, 
+                   YrsServ=esh$Yrs.Serv, 
+                   SexCode=SexCode)
+fit <- lm(ESH~., data=esh1)
+summary(fit)
+```
+
+```{r}
+  pushViewport(viewport(layout = grid.layout(1, 2)))
+  df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+  print(ggplot(data=df, aes(sample=Residuals)) +
+           geom_qq() + geom_qq_line(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+  print(ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0),
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+```
+
+The residual vs. fits and normal plot look good, so this is a good model.
+
+`r hl()$hr()`
+
+Or is it?
+
+Let's do the following: what would the equation look like if we knew the person was female? (or male). Well:
+
+$$
+\begin{aligned}
+&\text{Female ES.H}    = \\
+&7.035 + 0.097 \text{Yrs.Serv} - 2.591 \cdot 0    = \\
+&7.035 + \mathbf{0.097} \text{Yrs.Serv}     \\
+\end{aligned}
+$$
+
+$$
+\begin{aligned}
+& \text{Male ES.H}   = \\
+& 7.035 + 0.097 \text{Yrs.Serv} - 2.591 \cdot 1   = \\
+& 4.444 + \mathbf{0.097} \text{Yrs.Serv}    \\
+\end{aligned}
+$$
+
+Notice that both equations have the same slope, so we have **parallel** lines. 
+
+**Note** such a model is also often called an *additive* model, similar to an ANOVA without interaction!
+
+What does this look like? Here it is:
+
+```{r}
+ggplot(data=esh, aes(Yrs.Serv, ES.H, color=Sex)) +
+         geom_point() +
+         scale_color_manual(values=c("red", "blue")) +
+         geom_abline(intercept = c(7.035, 4.444), 
+                     slope = c(0.097, 0.097), 
+                     color=c("red", "blue")) 
+```
+
+
+Now a model with parallel line may or may not make sense for our data, but it does not have to. Except that no matter what, the way we used the categorical variable (simply code it and use it) we will **always** result in parallel lines!
+
+Is there a way to see whether this is ok here? Yes,  what we need is a version of the residual vs fits plot that identifies the plotting symbols by Sex. If the model is good, this residual vs fits plot should also show no pattern. 
+```{r}
+ggplot(data=df, aes(Fits, Residuals, color=Sex)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  geom_hline(yintercept = 0)
+```
+
+and as we can see there is a definite pattern in the colors.  
+
+`r hl()$hr()`
+
+So, how do we get away from parallel lines? This can be done by adding a variable Yrs.Serv\*SexCode. 
+
+```{r}
+esh1$prod <- esh1$YrsServ*esh1$SexCode
+fit.prod <- lm(ESH~., data=esh1)
+summary(fit.prod)
+```
+
+and now: 
+
+$$
+\begin{aligned}
+&\text{Female ES.H} =\\ 
+&7.323 + 0.072 \text{Yrs.Serv} - 3.203 \cdot 0 +0.065 \cdot \text{Yrs.Serv*0}=\\ 
+&7.323 + 0.072 \text{Yrs.Serv}
+\end{aligned}
+$$
+
+$$
+\begin{aligned}
+&\text{Male ES.H} =\\ 
+&7.323 + 0.072 \text{Yrs.Serv} - 3.203 \cdot 1 + 0.065 \cdot \text{Yrs.Serv*1}=\\ 
+&4.120 + 0.138 \text{Yrs.Serv}
+\end{aligned}
+$$
+
+and so this fits *two separate lines*.
+
+```{r}
+ggplot(data=esh, aes(Yrs.Serv, ES.H, color=Sex)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE)
+```
+
+Now the residual vs. fits plot looks like this:
+
+```{r}
+df <- data.frame(Residuals=resid(fit.prod), 
+            Fits = fitted(fit.prod))
+ggplot(data=df, aes(Fits, Residuals, color=Sex)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  geom_hline(yintercept = 0)
+```
+
+**Note** you can get the same two equations by splitting up the dataset into two parts, the score and years of the Females and the score and years of the Males, and then doing a simple regression for both: 
+
+```{r}
+round(coef(lm(ES.H[Sex=="Female"]~Yrs.Serv[Sex=="Female"])), 3)
+round(coef(lm(ES.H[Sex=="Male"]~Yrs.Serv[Sex=="Male"])), 3)
+```
+
+Doing one multiple regression has some advantages, though. For example you get one R^2^ for the whole problem, not two for each part. Moreover, usually this R^2^ will be higher than either of the other two.
+
+Above we fitted the independent lines model by explicitely calculating the product term. A better way is to do this:
+
+```{r}
+esh2 <- esh
+esh2$Sex <- SexCode
+fit.prod <- lm(ES.H~.^2, data=esh2)
+round(coef(fit.prod), 3)
+```
+
+`r hl()$hr()`
+
+So now we have two models:
+
+- parallel lines: ES.H  =  7.035 + 0.097 Yrs.Serv - 2.591 Sex 
+
+R^2^ = 83.9%
+
+- separate lines: ES.H  =  7.323 + 0.072 Yrs.Serv - 3.203 SexCode + 0.065 Yrs.Serv*SexCode  
+
+R^2^=85.85%
+
+Clearly the second one has a higher R^2^, but then the first one is a special case of the second (nested models) and so the model with parallel lines will **never** have an R^2^ higher than the model with separate lines, and usually always has an R^2^ a bit lower. 
+
+Of course the parallel lines model has two terms while the other one has three, and the third one is more complicated, so we would prefer the parallel lines model, if possible.
+
+What we want to know is whether the model with two separate lines is **statistically significantly** better than the model with parallel lines. So we need a hypothesis test with:
+
+H~0~: the two separate lines model is NOT statistically significantly better than the parallel lines model.
+
+H~a~: the two separate lines model is statistically significantly better than the parallel lines model.
+
+Notice that the parallel lines model is a special case of the two independent lines model, and so we can again  use the *anova* to decide which is better:
+
+```{r}
+anova(fit.prod, fit) 
+```
+
+gives a p-value of  0.1608 > 0.05, so the parallel lines model is just as good as the model with separate lines.
+
+
+### Prediction 
+
+Let's find 95% interval estimates for female employees with 0, 1, 2,..,10 years of service, using the parallel lines model:
+
+```{r}
+fit <- lm(ES.H~., data=esh2)
+nw <- data.frame(Yrs.Serv=0:10, Sex=rep(0, 11))
+round(predict(fit, nw, interval="prediction"), 2)
+```
+
+## Lines and Interaction
+
+Above we explained the problem of using categorical predictors in a regression model in terms of parallel lines vs. two independent lines. But in fact this another example of the issue of *interaction*, or more generally of a relationship between the predictors. Parallel lines are ok if the categorical and the continuous predictors are essentially independent. Often terms such as Yrs Serv\*SexCode are also called *interaction terms*.
+
+For your purposes in this class (and later when doing work such as this) simply remember to include product terms when you have categorical predictors. Then you can test if that term is really needed, and drop it if it is not.
+
+
+#### **Example**: Sales of Shoes
+
+The number of shoes sold by year and type.
+```{r}
+head(shoesales)
+```
+Let's have a look at the data: 
+
+```{r echo=FALSE}
+attach(shoesales)
+```
+
+```{r}
+ggplot(data=shoesales, aes(Year, Sales, color=Type)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE)
+```
+
+We want to find a model for predicting Sales from Year and Type. Again Type is a categorical variable and so we need to code it. The most obvious thing to do would be to code:
+
+-  Mens= 0  
+-  Kids= 1  
+-  Ladies = 2  
+
+but that is dangerous. Unlike a categorical variable numbers always have an order and a size. So by coding in this way we are saying that Mens comes before Kids. Worse , we are saying that the "distance" from Mens to Kids is the same as the "distance" from Kids to Ladies! 
+
+Whether this matters or not dependes on the specific problem. There is however a way to include such a variable without introducing order or size:
+
+```{r}
+d1 <- rep(0, length(Type))
+d1[Type=="Kids"] <- 1
+d2 <- rep(0, length(Type))
+d2[Type=="Ladies"] <- 1
+```
+
+Notice that by knowing d1 and d2 we now exactly what the type is:
+
+- d1=0, d2=0 &rarr; Mens  
+- d1=1, d2=0 &rarr; Kids  
+- d1=0, d2=1 &rarr; Ladies  
+
+so we have not lost any information, but we have also not introduced any order or size!
+
+Now
+
+```{r}
+df <- shoesales[, 1:2] 
+df$d1 <- d1
+df$d2 <- d2
+fit <- lm(Sales~., data=df)
+summary(fit)
+```
+
+
+This is of course an additive model, again we should worry about interaction. But now we have two categorical predictors, so we need to add two product terms:
+
+```{r}
+fit.prod <- lm(Sales~.^2-d1:d2, data=df)
+summary(fit.prod)
+```
+
+And again we can test whether the product terms are needed:
+
+```{r}
+anova(fit.prod, fit)  
+```
+
+and we find that here the interaction is needed (p = 0.0003).
+
+#### **Example**: Headache and Pain Reliever
+
+A pharmaceutical company set up an experiment in which patients with a common type of headache were treated with a new analgesic or pain reliever. The analgesic was given to each patient in one of four dosage levels: 2, 5, 7 or 10 grams. Then the time until noticeable relieve was recorded in minutes. In addition the sex (coded as Female=0 and Male=1) and the blood pressure of each patient was recorded. The blood pressure groups where formed by comparing each patients diastolic and systolic pressure reading with historical data. Based on this comparison the patients are assigned to one of three types: low (0.25), medium (0.5), high (0.75) according to the respective quantiles of the historic data.
+
+```{r}
+head(headache)
+```
+
+here Sex and BP.Quan are already coded. BP.Quan is an interesting case because although it is categorical, it does have ordering and even a little bit of "size".
+
+we want to determine the optimal dosage for each patient, possibly depending on sex and blood pressure.
+
+```{r fig.width=10}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ggplot(data=headache, 
+             aes(Dose, Time, color=factor(Sex))) +
+        geom_point() +
+        geom_smooth(method = "lm", se=FALSE) +
+        theme(legend.position="none") +
+        labs(title="Sex"),
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=headache, 
+             aes(Dose, Time, color=factor(BP.Quan))) +
+        geom_point() +
+        geom_smooth(method = "lm", se=FALSE) +
+        theme(legend.position="none") +
+        labs(title="BP.Quan"),
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))      
+```
+
+Let's start by fitting a linear model on Dose alone:
+
+```{r}
+fit <- lm(Time~Dose, data=headache)
+df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0)
+```
+
+There is a bit of a pattern here, so let's try a quadratic model. In this example we will eventually need the actual equations, so we won't use poly:
+
+```{r}
+headache$Dose2 <- headache$Dose^2
+fit <- lm(Time~Dose+Dose2, data=headache)
+df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0)
+```
+
+and that looks better.
+
+Now we will include the other two variables. One interesting question is whether BP.Quan is quantitative or categorical (in which case we should turn it into two dummy variables). The answer is not clear, and we will leave it alone. So
+
+```{r}
+fit <- lm(Time~(Dose+Sex+BP.Quan)^3+Dose2, data=headache)
+pushViewport(viewport(layout = grid.layout(1, 2)))
+df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+print(ggplot(data=df, aes(sample=Residuals)) +
+           geom_qq() + geom_qq_line(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0),
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+```
+
+
+```{r}
+summary(fit)
+```
+
+we see that the threeway interaction Dose:Sex:BP.Quan is not stat. significant (p=0.969), so we drop it:
+
+```{r}
+fit <- lm(Time~(Dose+Sex+BP.Quan)^2+Dose2, data=headache)
+summary(fit)
+```
+
+again, two interactions are not significant, so
+
+```{r}
+fit <- lm(Time~.+ Dose:BP.Quan, data=headache)
+summary(fit)
+```
+
+and now all terms are significant.
+
+What does all of this look like?
+
+```{r}
+x <- seq(2, 12, length=100)
+y <- 0:1
+z <- c(0.25, 0.5, 0.75)
+xy <- expand.grid(x, y, z)
+df <- data.frame(Dose=xy[, 1], Dose2=xy[, 1]^2,
+                 Sex=xy[, 2], BP.Quan=xy[, 3])
+df$Time <- predict(fit, df)
+```
+
+```{r}
+ggplot(data=df, aes(Dose, Time, color=factor(Sex))) +
+  geom_line() +
+  facet_wrap(~factor(BP.Quan)) +
+  labs(color="Gender")
+```
+
+and so we can give the following advice:
+
+-  the same dosage will work for men and women  
+-  for people with low blood pressure give 7.5mg  
+-  for people with medium blood pressure give 11mg  
+-  for people with high blood pressure give 9mg  

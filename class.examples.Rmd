@@ -1,0 +1,218 @@
+---
+title: Classification Examples
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+```{r}
+library(MASS)
+library(rpart)
+library(class)
+library(nnet)
+library(e1071)
+```
+
+
+In this section we will study the performance of the classification methods discussed earlier. We will use the miss-classification rate and cross-validation.
+
+As we saw, each of the methods has a slightly different list of arguments. It will therefore be worthwhile to write a single routine that does them all.
+
+```{r echo=FALSE}
+library(mvtnorm)
+ex1 <- function(mu=2, n=50) {
+  x1 <- rmvnorm(n, mean=c(0,0), sigma=diag(2)) 
+  x2 <- rmvnorm(n, mean=c(mu,mu), sigma=diag(2)) 
+  data.frame(x=c(x1[, 1], x2[, 1]), 
+             y=c(x1[, 2], x2[, 2]), 
+             group=rep(c("A", "B"), each=n))
+}
+ex2 <- function(mu=2, n=50) {
+  x <- cbind(runif(10000), runif(10000, -1, 1))
+  x <- x[x[, 1]^2 + x[, 2]^2<1, ]
+  x <- x[1:n, ]
+  y <- cbind(runif(10000, 0, 2), runif(10000, -2, 2))
+  y <- y[y[, 1]^2 + y[, 2]^2>0.9, ]
+  y <- y[1:n, ]
+  data.frame(x=c(x[, 1], y[, 1]), 
+             y=c(x[, 2], y[, 2]), 
+             group=rep(c("A", "B"), each=n))
+}
+ex3 <- function(mu=2, n=33) {
+  x1 <- rmvnorm(n, mean=c(0, 0), sigma=diag(2)) 
+  x2 <- rmvnorm(n, mean=c(mu, mu), sigma=diag(2)) 
+  x3 <- rmvnorm(n, mean=2*c(mu, mu), sigma=diag(2))
+  data.frame(x=c(x1[, 1], x2[, 1], x3[, 1]), 
+             y=c(x1[, 2], x2[, 2], x3[, 2]), 
+             group=rep(c("A", "B", "C"), each=n))
+}
+make.grid <- function(df) {
+  x <- seq(min(df$x), max(df$x), length=100)
+  y <- seq(min(df$y), max(df$y), length=100)
+  expand.grid(x=x, y=y) 
+}  
+gen.ex <- function(which, n=50) {
+  if(which==1) 
+      df <- ex1(n=n)
+  if(which==2) 
+      df <- ex2(n=n)  
+  if(which==3) 
+      df <- ex3(n=n)  
+  df$Code <- ifelse(df$group=="A", 0, 1)
+  if(which==3) 
+    df$Code[df$group=="C"] <- 2
+  df
+}
+```
+
+```{r echo=FALSE}
+do.plot <- function(df, df1) {
+  print(ggplot(data=df, aes(x, y, color=group)) +
+     geom_point(size=2) +
+     theme(legend.position="none") +
+     geom_point(data=df1, 
+             aes(x,y, color=group,
+             alpha=0.05,
+             inherit.aes=FALSE)))
+}
+msr <- function(x, y) {
+  z <- table(x, y)
+  round((sum(z)-sum(diag(z)))/sum(z)*100, 1)
+}
+```
+
+```{r}
+do.class <- function(df, I, B=100, which=1:6) {
+  miss.rate <- matrix(0, B, 7)
+  n <- dim(df)[1]
+  colnames(miss.rate) <- c("LDA", "QDA", "Tree", "NN", 
+                        "SVM", "knn 3", "knn 9")
+  for(i in 1:B) {
+    I <- sample(1:n, size=floor(n/2))
+    train <- df[I, ]
+    colnames(train)[1] <- "group"
+    if(1 %in% which) {
+      fit <- lda(group~., data=train)
+      pred <- predict(fit, df[-I, -1])$class
+      miss.rate[i, "LDA"] <- msr(factor(df[-I, 1]), pred)
+    }
+    if(2 %in% which) {
+      fit <- qda(group~., data=train)
+      pred <- predict(fit, df[-I, -1])$class
+      miss.rate[i, "QDA"] <- msr(factor(df[-I, 1]), pred)
+    }
+    if(3 %in% which) {    
+      fit <-rpart(group~., data=train, method = "class")
+      pred <- predict(fit, df[-I, -1], type="class")
+      miss.rate[i, "Tree"] <- msr(factor(df[-I, 1]), pred)
+    }
+    if(4 %in% which) {    
+      fit <- nnet(factor(group)~., data=train, size=2, 
+               rang = 0.1, trace=0,
+              decay = 5e-4, maxit = 200)
+      pred <- predict(fit, df[-I, -1], type="class")
+      miss.rate[i, "NN"] <- msr(df[-I, 1], pred)
+    }
+    if(5 %in% which) {    
+      fit <- svm(factor(group)~., data=train)
+      pred <- predict(fit, df[-I, -1])
+      miss.rate[i, "SVM"] <- msr(df[-I, 1], pred)
+    }    
+    if(6 %in% which) {    
+      pred <-  factor(
+       knn(df[I, -1], df[-I, -1], cl=df[I, 1], k=3))
+      miss.rate[i, "knn 3"] <- msr(factor(df[-I, 1]), pred)
+    } 
+    if(7 %in% which) {    
+      pred <-  factor(
+       knn(df[I, -1], df[-I, -1], cl=df[I, 1], k=9))
+      miss.rate[i, "knn 9"] <- msr(factor(df[-I, 1]), pred)
+    }  
+  }
+  apply(miss.rate[, which], 2, mean)
+}
+```
+
+```{r cache=TRUE}
+df <- gen.ex(1)
+sort(do.class(df[, c(3, 1, 2)]))
+df <- gen.ex(2)
+sort(do.class(df[, c(3, 1, 2)]))
+df <- gen.ex(3)
+sort(do.class(df[, c(3, 1, 2)]))
+```
+
+#### **Example**: Fisher's Iris
+
+```{r cache=TRUE}
+sort(do.class(iris[, c(5, 1:4)]))
+```
+
+#### **Example**: Kypthosis
+
+```{r error=TRUE}
+sort(do.class(kyphosis))
+```
+
+QDA does not work here. Essentially there is not enough data to fit a quadratic model. So
+
+```{r}
+sort(do.class(kyphosis, which=c(1, 3:7)))
+```
+
+
+#### **Example**: Painters
+
+The subjective assessment, on a 0 to 20 integer scale, of 54 classical painters. The painters were assessed on four characteristics: composition, drawing, colour and expression. They were also grouped in 8 "Schools". The data is due to the Eighteenth century art critic, de Piles.
+
+```{r}
+head(painters)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(ggplot(data=painters, aes(School, Composition)) +
+           geom_boxplot(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=painters, aes(School, Drawing)) +
+           geom_boxplot(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+print(ggplot(data=painters, aes(School, Colour)) +
+           geom_boxplot(),
+    vp=viewport(layout.pos.row=2, layout.pos.col=1))
+print(ggplot(data=painters, aes(School, Expression)) +
+           geom_boxplot(),
+    vp=viewport(layout.pos.row=2, layout.pos.col=2))        
+```
+
+
+```{r error=TRUE}
+sort(do.class(painters[, c(5, 1:4)]))
+```
+
+Again QDA does not work here. So
+
+```{r}
+sort(do.class(painters[, c(5, 1:4)], which=c(1, 3:7)))
+```
+
+ and this is clearly a very difficult classification problem, none of the methods does well.
+ 
+It should also be pointed out that we have used all these methods essentially with their defaults. In real life one woud play around with the tuning parameters to get better performance. 

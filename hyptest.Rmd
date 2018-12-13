@@ -1,0 +1,419 @@
+---
+title: Hypothesis Testing
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+First off, hypothesis testing is a rather complicate business. We will here discuss just one method for developing a hypothesis tests. Also, there are many issues envolved in testing that are not of a mathematical nature. Unless you have previously taken a course on Statistics I highly recommend that you read the discussion in [ESMA 3101 - Hypothesis Testing](http://academic.uprm.edu/wrolke/esma-3015-3101/hyptest.html). 
+
+## General Problem Statement
+
+As before we have the following general setup: we have data $x_1, .., x_n$ from some density $f(x|\theta)$. We want to test 
+
+$$
+H_0: \theta \in \Theta_0 \text{ vs }H_a: \theta \notin \Theta_0
+$$
+for some subset of the parameter space $\Theta_0$.
+
+####  **Example**: : Coin Tossing
+
+we flip a coin 1000 times and 549 heads. Is this a fair coin?
+
+Here the parameter of interest $\theta$ is the probability of heads in one flip of this coin. Each flip is a Bernoulli trial, so we have 
+
+$$
+f(x|\theta)=\theta^x(1-\theta)^{1-x}, x=0,1
+$$
+
+A fair coin has $\theta=0.5$, so $\Theta_0=\left\{0.5\right\}$ and we can write the hypotheses as
+
+$$
+H_0: \theta =0.5 \text{ vs }H_a: \theta \ne 0.5
+$$
+
+Of course this is a standard statistics problem, with a standard solution. Let's also consider two examples where the correct method is not obvious:
+
+#### **Example**: Two Poisson means
+
+A medical researcher carries out the following experiment: each day he gives 100 fruitflies either a poison type A or type B. In the evening he counts how many flies are dead. He finds:
+
+```{r echo=FALSE}
+poisons <- data.frame(
+  Dead=c(rpois(30, 12), rpois(30, 13)),
+  Poison=rep(c("A", "B"), each=30))
+```
+
+```{r}
+ht(poisons)
+```
+
+He wants to know whether the two poisons are equally effective.
+
+Strictly speaking the number of dead flies follows a Binomial distribution with n trials and success probability $\pi$, but because n is large and $\pi$ is small it is ok to treat them as Poisson rv's with rates $\lambda_A$ and $\lambda_B$. Then the hypotheses are 
+
+
+$$
+H_0: \lambda_A = \lambda_B \text{ vs }H_a: \lambda_A \ne \lambda_B
+$$
+so here $\Theta_0=\left\{(x,y):0\le x=y \right\}$
+
+#### **Example**:  Beta parameters
+
+Below is a sample from the  Beta$(\alpha, \beta)$ distribution and we wish to test 
+
+$$
+H_0: \alpha \le \beta \text{ vs }H_a: \alpha > \beta
+$$
+so here we have $\Theta_0=\left\{(x,y):0\le x \le y \right\}$
+
+```{r echo=FALSE}
+beta.sample <- 
+  sort(round(rbeta(200, 2.2, 2), 2))
+```
+
+```{r}
+beta.sample[c(1:5, 196:200)]
+```
+
+## Basic Concepts of Hypothesis Testing
+
+###  Critical Region CR
+
+this is the set of points $(x_1, .., x_n)$ that if this were the observed data we would reject the null hypothesis.
+
+####  **Example**:  Coin Tossing
+
+we want to test
+
+$$
+H_0: \theta =0.5 \text{ vs }H_a: \theta \ne 0.5
+$$
+
+the mle of $\pi$ is $\hat{p} = x/n$ (here 549/1000 = 0.549). Under H~0~ $\hat{p}$ should be close to 0.5, so a sensible critical region would be of the form  
+
+$$
+|\hat{p}-0.5|>c
+$$
+for some number c. c is often called a *crtitcal value*.
+
+#### **Example**: Poisson means
+
+the mle of a Poisson rate $\lambda$ is the sample mean, so a test could be based on
+
+$$
+|\bar{X}_A - \bar{X}_B|>c
+$$
+
+#### **Example**: Beta parameters
+
+Let $\hat{\alpha}, \hat{\beta}$ be the mle's of $\alpha$ and $\beta$, the a critical region could be
+
+$$
+\hat{\alpha} - \hat{\beta} >c
+$$
+
+### Type I error, level of test $\alpha$
+
+How do we find a CR? This is done by first choosing $\alpha$, the probability of the type I error. This in turn is the error to reject H~0~ although it is true. 
+
+####  **Example**:  Coin Tossing
+
+From probability theory we know that 
+
+$$
+\sqrt{n}\frac{\hat{p}-0.5}{\sqrt{p_0(1-p_0)}} \sim N(0, 1)
+$$
+
+so we find
+
+$$
+\begin{aligned}
+& \alpha = P_{\pi=0.5}(|\hat{p}-0.5|>c )= \\
+&1-P_{\pi=0.5}(|\hat{p}-0.5|\le c) = \\
+& 1-P_{\pi=0.5}(-c \le \hat{p}-0.5 \le c) = \\
+& 1-P_{\pi=0.5}(-\frac{\sqrt{n}c}{\sqrt{p_0(1-p_0)}} \le \sqrt{n}\frac{\hat{p}-0.5}{\sqrt{p_0(1-p_0)}} \le \frac{\sqrt{n}c}{\sqrt{p_0(1-p_0)}}) = \\
+&1-(1-2\Phi(\frac{\sqrt{n}c}{\sqrt{p_0(1-p_0)}}))\\
+&\Phi(\frac{\sqrt{n}c}{\sqrt{p_0(1-p_0)}})=\alpha/2 \\
+&\frac{\sqrt{n}c}{\sqrt{p_0(1-p_0)}}=z_{\alpha/2} \\
+&c=z_{\alpha/2}\sqrt{p_0(1-p_0)/n} 
+\end{aligned}
+$$
+
+If we use $\alpha=0.05$ we find
+
+```{r}
+cc <- qnorm(1-0.05/2)*sqrt(0.5*(1-0.5)/1000)
+cc
+```
+
+and so we would reject the null if
+
+$$
+\begin{aligned}
+&|\hat{p}-0.5|>0.031 \\
+&x/n<0.5-0.031 \text{ or } x/n>0.5+0.031 \\
+&x<469 \text{ or } x>531
+\end{aligned}
+$$
+we got x=549, so we would indeed reject the null.
+
+#### **Example**:  Poisson means
+
+A CR could be constructed by noting that according to the *central limit theorem* the sample means have approximate normal distributions.
+
+#### **Example**:  Beta parameters
+
+we don't even know how to find the mle's analytically, so this won't work.
+
+## p value of a test
+
+The idea of the p value is as follows. Suppose we repeat the exact same experiment, how likely is it to observe the same outcome, or something even less likely, as what we just saw, assuming the null hypothesis is true? 
+
+If this probability is small (say $< \alpha$), then we just observed something very rare. Alternatively our assumption that the null hypothesis is true is false, and we should reject it!
+
+####  **Example**:  Coin Tossing
+
+we got 549 heads in 1000 flips, so the p value would be the probability to flip a fair coin 1000 times and get 549 or more heads. Actually it would be $|\hat{p}-0.5|\ge0.049$ because under our alternative to few heads would also result in a rejection of the null.
+
+Note that
+
+$$
+|\hat{p}-0.5|\ge0.049 \Leftrightarrow \\
+ \hat{p}-0.5 < -0.049 \text{ or } \hat{p}-0.5 > 0.049 \Leftrightarrow \\
+x/n <0.451 \text{ or } x/n>0.549 \Leftrightarrow \\
+x<451 \text{ or } x > 549  \\
+$$
+
+and so we can find the p value with
+
+```{r}
+sum(dbinom(c(0:450, 550:1000), 1000, 0.5))
+```
+
+$0.0017<0.05$, and so we do reject the null
+
+### Power of a Test
+
+the power of a test is the probability to reject the null when it is false. 
+
+Under the null we know what $\theta$ is, namely $\theta_0$. Under the alternative however there are many possibilites. So the power of a test is actually a function of the possible parameter values under the alternative hypothesis.
+
+####  **Example**: Coin Tossing
+
+our test is: *reject H~0~ if $x<469 \text{ or } x>531$*. So the power of the test is to do so if p is any value:
+
+```{r}
+cr <- c(0:468, 532:1000)
+p <- seq(0.4, 0.6, length=100)
+power <- p
+for(i in 1:100) {
+  power[i] <- sum(dbinom(cr, 1000, p[i]))
+}
+ggplot(data.frame(p=p, y=power),
+       aes(p, y)) +
+  geom_line() +
+  labs(x="p", y="Power")
+```
+
+so we see that if thre $\pi$ is differs from 0.5 by more than 0.05, we will almost certainly be able to detect this with 1000 flips.
+
+`r hl()$hr()`
+
+The power of a test has many uses:
+
+-  decide whether an experiment is worth doing. If it has a low power, it might be a waste of time.  
+-  find what sample size would be required to have a reasonably powerful test.  
+-  decide which of several methods is best, aka has the highest power.
+
+`r hl()$hr()`
+
+Next we will discuss a general method for deriving hypothesis tests called the
+
+## The likelihood ratio test
+
+The *likelihood ratio test statistic* is defined by 
+
+$$
+\Lambda(\boldsymbol{x}) = \frac{ \max_{\Theta_0} L(\theta)}{\max L(\theta)}
+$$
+where L is the likelihood function.
+
+Not that from the definition it is clear that $0 \le \Lambda \le 1$. 
+
+First of, note that in denominator the maximum is taken over all values of $\theta$, so this is just like finding the maximum likelihood estimator!
+
+
+Let's find out what we have in the three examples:
+
+#### **Example**:  Coin Tossing
+
+we have previously found
+
+$$
+L(\theta) = \theta^y(1-\theta)^{n-y}
+$$
+where y was the number of successes and n the number of trials. Also, here $\Theta_0=\left\{0.5\right\}$, so in the denominator the maximum is taken over just one value. The mle is $y/n$ so
+
+
+$$
+\begin{aligned}
+&\Lambda(\boldsymbol{x}) =\frac{0.5^y(1-0.5)^{(n-y)}}{(y/n)^y(1-(y/n))^{n-y}}    = \\
+& \left(\frac{n}{2y}\right)^y \left(\frac{n}{2(n-y)}\right)^{n-y}  \\
+\end{aligned}
+$$
+
+Note that under the null $\pi=0.5$, so $y \sim n/2$, so $n/(2y) \sim 1$, $n/(2(n-y)) \sim 1$ and so $\Lambda \sim 1$.
+
+#### **Example**:  Poisson rates
+
+Here we find
+
+$$
+\begin{aligned}
+&f(x_1,..,x_n,y_1,..,y_n;\lambda_A, \lambda_B) =\\
+& \prod_i \frac{\lambda_A^{x_i}}{x_i!}e^{-\lambda_A}\prod_i \frac{\lambda_B^{y_i}}{y_i!}e^{-\lambda_B}\\
+&l(\lambda_A, \lambda_B) = \log f  =   \\
+&\log \lambda_A \sum x_i  - n\lambda_A +\log \lambda_B \sum y_i  - n\lambda_B   +K \\
+&\frac{dl}{d\lambda_A} = \frac{\sum x_i}{\lambda_A} -n = 0
+\end{aligned}
+$$
+
+and so $\hat{\lambda}_A=\bar{X}$. Clearly also $\hat{\lambda}_B=\bar{Y}$. Now under H~0~ $\lambda_A=\lambda_B=:\lambda$, and we find
+
+$$
+l(\lambda) = \log \lambda \sum (x_i+y_i)  - 2n\lambda
+$$
+and so $\hat{\hat{\lambda}} = \frac{\sum (x_i+y_i)}{2n}$
+
+#### **Example**:  Beta parameters
+
+the beta density is given by
+
+$$
+f(x;\alpha,\beta)=\frac{\Gamma (\alpha+\beta) }{\Gamma (\alpha) \Gamma(\beta)}x^{\alpha-1}(1-x)^{\beta-1}
+$$
+so the log likelihood function is given by
+
+$$
+l(\alpha,\beta)= n\log \Gamma (\alpha+\beta) - n\log  \Gamma (\alpha) - n\log  \Gamma (\beta) +\\
+(\alpha-1) \sum \log x_i + (\beta -1) \sum \log(1-x_i)
+$$
+
+now using calculus is certainly not going to work, so we need to use a numerical method:
+
+```{r}
+beta.mle <- function(x) {
+  log.like <- function(par) {
+    -sum(log(dbeta(x, par[1], par[2])))
+  } 
+  mle <- optim(c(1, 1), log.like)$par
+  log.like <- function(par) {
+    -sum(log(dbeta(x, par, par)))
+  } 
+  mle.null <- optim(1, log.like)$par
+  c(mle, mle.null)
+}
+beta.mle(beta.sample)
+```
+
+###  Wilks' Theorem
+
+The usefulness of the likelihood ratio test statistic comes from the following famous theorem due to Wilks (1938):
+
+Under some regularity conditions we find
+
+$$
+-2 \log \Lambda(\boldsymbol{X}) \sim \chi^2(p)
+$$
+
+where p is the difference between the number of free parameters in the model and the number of free parameters under the null hypothesis.
+
+Therefore we reject the null at the $\alpha$ level of significance if
+
+$$
+-2 \log \Lambda(\boldsymbol{X}) > \text{qchisq}(1-\alpha, p)
+$$
+
+Notice that it usually more convenient to calculate 
+
+$$
+\begin{aligned}
+&-2 \log \Lambda(\boldsymbol{X})    = \\
+& -2 \log \left\{ \frac{l(\hat{\hat{\theta}})}{l(\hat{\theta})}  \right\}   = \\
+& 2 \left\{ \log l(\hat{\theta}) - \log  l(\hat{\hat{\theta}})\right\} \\
+\end{aligned}
+$$
+
+We said before that $0 < \Lambda < 1$, so $-2\log \Lambda\ge0$. Also under H~0~ $\Lambda \sim 1$, so $-2 \log \Lambda \sim 0$
+
+#### **Example**: Coin Tossing
+
+$$
+\begin{aligned}
+&-2 \log \Lambda(\boldsymbol{x})    = \\
+&(-2) \log \left\{ \left(\frac{n}{2y}\right)^y \left(\frac{n}{2(n-y)}\right)^{(n-y)} \right\}    = \\
+& (-2) \left\{ y\log \frac{n}{2y}+(n-y) \log \frac{n}{2(n-y)}
+\right\}  
+\end{aligned}
+$$
+```{r}
+n <- 1000
+y <- 549
+lrt <- (-2)*(y*log(n/2/y)+(n-y)*log(n/2/(n-y)))
+lrt
+qchisq(1-0.05, 1)
+```
+
+and so we reject the null hypothesis, this does not seem to be a fair coin.
+
+We can also easily find the p value of the test:
+
+```{r}
+1-pchisq(lrt, 1)
+```
+
+
+#### **Example**: Poisson rates
+
+```{r}
+x <- poisons$Dead[poisons$Poison=="A"]
+y <- poisons$Dead[poisons$Poison=="B"]
+lrt <- 2*( sum(log(dpois(x, mean(x)))) +
+           sum(log(dpois(y, mean(y)))) -
+          sum(log(dpois(c(x, y), mean(c(x, y)))))   
+)
+lrt
+1-pchisq(lrt, 1)
+```
+
+#### **Example**: Beta parameters
+
+```{r}
+p <- beta.mle(beta.sample)
+lrt <- 2*( 
+  sum(log(dbeta(beta.sample, p[1], p[2]))) -
+  sum(log(dbeta(beta.sample, p[3], p[3])))
+)
+lrt
+1-pchisq(lrt, 1)
+```
+
+and here we have weak evidence that the null is false.

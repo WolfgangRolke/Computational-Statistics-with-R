@@ -1,0 +1,91 @@
+---
+title: ESMA 6836 Computational Statistics with R
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+library(wolfr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+               out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+library(stringr)
+```
+`r hl()$basefontsize()`
+
+[Computational_Statistics_with_R.pdf](Computational_Statistics_with_R.pdf)  
+[Syllabus](syl.html)  
+[Assignments](assign.html)  
+[Resma3.RData](http://academic.uprm.edu/wrolke/Resma3/Resma3.RData?Ver 3.1) (Ver 3.1)
+
+## Chapter 1:  R
+
+1.1&nbsp;  [Installation and updating](install.html)  
+1.2&nbsp;  [R Markdown, HTML and latex](Rmarkdown.html)  
+1.3&nbsp;  [R basics](rbasics.html)  
+1.4&nbsp;  [Programming in R](writing.functions.html)  
+1.5&nbsp;  [Random numbers and simulation](random.numbers.html)  
+1.6&nbsp;  [Graphs with ggplot2](ggplot2.html)  
+1.7&nbsp;  [List of base R commands](important.commands.html)  
+
+##  Chapter 2:  General Statistics
+
+2.1&nbsp;  [Descriptive Statistics](descriptive.html)  
+2.2&nbsp;  [Parameter estimation](mle.html)  
+2.3&nbsp;  [Confidence intervals](confidence.intervals.html)  
+2.4&nbsp;  [Hypothesis testing](hyptest.html)  
+2.5&nbsp;  [Bayesian analysis](bayes.html)  
+2.6&nbsp;  [Simulation](simulation.html)  
+2.7&nbsp;  [The bootstrap](bootstrap.html)  
+2.8&nbsp;  [Basic inferences](basic.inferences.html)  
+2.9&nbsp;  [ANOVA](oneway.html)  
+2.10  [Transformations and nonparametric methods](nonpar.html)  
+2.11  [Model Checking](model.check.html)
+
+##  Chapter 3: Models with one predictor
+
+3.1&nbsp;  [Simple regression](simple.regression.html)  
+3.2&nbsp;  [Assumptions](assumptions.html)  
+3.3&nbsp;  [Prediction](predict.html)  
+3.4&nbsp;  [Nonlinear models](nonlin.html)  
+3.5&nbsp;  [Finding the best model](overfit.html)  
+3.6&nbsp;  [Nonparametric regression](smooth.html)  
+3.7&nbsp;  [Nonlinear parametric models](nonlinpar.html)   
+3.8&nbsp;  [Logistic Regression](logistic.regression.html)
+
+##  Chapter 4: Models with more than one predictor
+
+4.1&nbsp;  [ANOVA](twoway.html)  
+4.2&nbsp;  [Multiple regression](multiple.regression.html)  
+4.3&nbsp;  [Models with dummy variables](dummy.html)  
+4.4&nbsp;  [Generalized additive models](general.additive.html)  
+4.5&nbsp;  [Subset selection and ridge regression](ridge.html)  
+4.6&nbsp;  [Regression trees](tree.html)  
+4.7&nbsp;  [Principal components analysis](principal.components.html)
+
+##  Chapter 5: Classification
+
+5.1&nbsp;  [Introduction](classification.html)  
+5.2&nbsp;  [LDA, QDA and k nearest neighbor](class.methods.html)  
+5.3&nbsp;  [Regression trees](class.tree.html)   
+5.4&nbsp;  [Neural networks and support vector machines](neural.net.html)  
+5.5&nbsp;  [Examples](class.examples.html)  
+
+##  Chapter 6: Special Topics
+
+6.1&nbsp;  [Survival analysis](survival.analysis.html)  
+6.2&nbsp;  [Nonparametric density estimation](density.html)  
+6.3&nbsp;  [Time series analysis](time.html)  
+

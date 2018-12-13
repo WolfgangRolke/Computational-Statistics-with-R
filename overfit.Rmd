@@ -1,0 +1,375 @@
+---
+title: Finding the best model
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+#### **Example**: Predicting the Usage of Electricity
+
+In Westchester County, north of New York City, Consolidated Edison bills residential customers for electricity on a monthly basis. The company wants to predict residential usage, in order to plan purchases of fuel and budget revenue flow. The data includes information on usage (in kilowatt-hours per day) and average monthly temperature for 55 consecutive months for an all-electric home. Data on consumption of electricity and the temperature in Westchester County, NY.
+ 
+```{r echo=FALSE}
+attach(elusage) 
+```
+ 
+ 
+```{r}
+head(elusage)
+ggplot(aes(Temperature, Usage), data=elusage) +
+  geom_point()
+```
+
+Let's find the least squares model:
+
+```{r}
+fit <- lm(Usage~Temperature, data=elusage)
+round(fit$coef, 2)
+```
+
+gives the model as 
+
+$$
+\text{Usage} = 116.72 - 1.36 \text{ Temperature} + \epsilon
+$$
+
+but
+
+```{r}
+ ggplot(data=data.frame(Fits=fitted(fit),
+                        Residuals=residuals(fit)),
+        aes(Fits, Residuals)) +
+  geom_point() +
+  geom_abline(slope = 0)
+```
+
+shows that this is a bad model.
+
+So now we try the
+
+- quadratic model
+
+```{r}
+quad.fit <- lm(Usage~poly(Temperature, 2),
+               data=elusage)
+```
+
+the residual vs fits plot for this model is
+
+```{r}
+ ggplot(aes(Fits, Residuals), 
+        data=data.frame(Fits=fitted(quad.fit),
+                        Residuals=residuals(quad.fit))) +
+  geom_point() +
+  geom_abline(slope = 0)
+```
+
+and that is much better. 
+
+-  Transformations
+
+
+```{r}
+log.usage <- log(Usage)
+log.temp <- log(Temperature)
+log.fit <- lm(log.usage~log.temp)
+```
+
+```{r}
+ ggplot(aes(Fits, Residuals), 
+        data=data.frame(Fits=fitted(log.fit),
+                        Residuals=residuals(log.fit))) +
+  geom_point() +
+  geom_abline(slope = 0)
+```
+
+
+`r hl()$hr()`
+
+Now we have to models with good residual vs fits plots. How do we choose among these models? A standard measure of the quality of the fit is the **Coefficient of Determination**. It is defined as 
+
+$$
+R^2 = \text{cor}(\text{Observed Values, Predicted Values})^2 100\%
+$$
+
+the better a model is, the more correlated it's fitted values and the observed values should be, so if we have a choice of two model, the one with the higher $R^2$ is better.
+
+Here we find
+
+```{r}
+# Quadratic Model
+round(100*summary(quad.fit)$r.squared, 2)
+# Log Transfrom Model
+round(100*summary(log.fit)$r.squared, 2)      
+```
+
+Now the $R^2$ of the quadratic model is $84.69\%$ and that of the log transform model is $81.12\%$, so the quadratic one is better.
+
+Let's have a look what those models look like:
+
+```{r}
+x <- seq(min(Temperature), max(Temperature), length=100)
+y.quad <- predict(quad.fit, 
+                  newdata=data.frame(Temperature=x))
+y.log <- exp(predict(log.fit, 
+                 newdata=data.frame(log.temp=log(x))))
+dta <- data.frame(x=c(x, x),
+                  y=c(y.quad, y.log),
+                  Model=rep(c("Quadratic", "Log"),
+                         each=100))
+ggplot(data=elusage, aes(Temperature, Usage)) +
+  geom_point() +       
+  geom_line(data=dta, aes(x, y, color=Model), size=1.2) +
+  xlab("Temperature") +
+  ylab("Usage")
+```
+
+`r hl()$hr()`
+
+Could we do even better? Let's check the cubic model:
+
+```{r}
+cube.fit <- lm(Usage~poly(Temperature,3),
+               data=elusage)
+round(100*summary(cube.fit)$r.squared, 2)   
+```
+
+and yes, it's $R^2=84.72>84.69$!
+
+but we need to be careful here: the quadratic model is a special case of the cubic model, and so it's $R^2$ can never be smaller. 
+
+The reason for this is simple: Say we find the best quadratic model, which is
+$$
+\text{Usage} = \hat{\beta}_{02} - \hat{\beta}_{12}\text{ T} + \hat{\beta}_{22}\text{ T}^2
+$$
+Now we add the cubic term T^3^ as a predictor. One (of many) cubic models is
+
+$$
+\text{Usage} = \hat{\beta}_{02} - \hat{\beta}_{12}\text{ T} + \hat{\beta}_{22}\text{ T}^2 +0.0\text{ T}^3
+$$
+
+this is of course the same as the quadratic model above, so it has $R^2=84.69\%$. Only the least squares cubic model is the **best** cubic model, so it's $R^2$ cannot be smaller (and because of statistical fluctuation usually will be even a bit higher, even if the cubic term is not useful). 
+
+### Question: which of these polynomial models should you use?
+
+#### Linear Model
+
+```{r, echo=FALSE}
+x <- 0:10/10
+set.seed(1)
+y <-  x + 30*x^2  + rnorm(11, 0, 1.5)
+out <- slr(y, x, return.result = TRUE)
+splot(y, x, add.line = 1)
+```
+
+#### Quadratic Model
+
+```{r, echo=FALSE}
+out <- slr(y, x, polydeg=2, return.result = TRUE)
+flplot(y, x, polydeg=2)
+```
+
+#### Cubic Model
+
+```{r, echo=FALSE}
+out <- slr(y, x, polydeg=3, return.result = TRUE)
+flplot(y, x, polydeg=3)
+```
+
+####  Power 11 Model
+
+```{r, echo=FALSE}
+# out <- slr(y, x, polydeg=4, return.result = TRUE)
+cf <- c(-0.939680715799193, 293.516759715529, -5298.88525575428, 
+30314.570804457, -29980.1018628968, -329363.012342885, 1491426.03770074, 
+-2906877.46266628, 3025992.97750815, -1643089.4892805, 366616.055987719
+)
+plt <- splot(y, x, return.graph = TRUE)
+x <- seq(0, 1,  length=250)
+y <- rep(cf[1], 250)
+for(i in 2:11) y <- y+cf[i]*x^(i-1)
+plt + geom_line(aes(x,y), colour="blue",size=1.2, data=data.frame(x=x, y=y))
+```
+
+and this one is perfect, it has $R^2=100\%$.
+
+Actually, it is **always** possible to find a polynomial model which fits the data set perfectly, that is it has $R^2=100\%$! (Hint: look up Legendre polynomials)
+
+**But**: we want our models to fit the relationship, not the random fluctuations in the dataset.
+
+A model should be **parsimoneous**, that is as simple as possible.
+
+This is in agreement with one of the fundamental principles of science:
+
+**Ockham's razor**, named after [William of Ockham](http://en.wikipedia.org/wiki/William_of_Ockham)
+
+
+Ockham's razor is the principle that "entities must not be multiplied beyond necessity" (entia non sunt multiplicanda praeter necessitatem). The popular interpretation of this principle is that the **simplest explanation is usually the correct one**.
+  
+For our problem this means: Use the polynomial model of **lowest degree** that can't be improved statistically significantly by adding another power.
+
+Let's consider again the quadratic and the cubic models: the cubic model is better than the quadratic one (in terms of R^2^), but is it **statistically significantly** better?
+
+It turns out we can actually test this:
+
+```{r}
+anova(cube.fit, quad.fit)
+```
+
+and so the answer is no, the cubic is not better. So we should use the quadratic one!
+
+`r hl()$hr()`
+
+`r hl()$fontcolor("Warning")` as always a GOOD MODEL is one with a good residual vs. fits plot. It can happen that both the quadratic and the cubic are bad models and this test fails to reject the null because they are equally bad!
+
+`r hl()$hr()`
+
+**Note**: if we have two models, one of which is a special case of the other, we say we have *nested* models. 
+
+**Example**: quadratic and cubic
+
+**Example**: y vs x and y vs x, z 
+
+In all of those cases the model with more predictors will NEVER have a smaller $R^2$, so using $R^2$ would always lead to the model with all the terms, which may not be best. 
+
+## Choosing between good Models
+
+In choosing the best model (from our short list) proceed as follows:
+Model is "good" = no pattern in the Residual vs. Fits plot
+
+1. If a linear model is good, use it, **you are done**  
+
+If the linear model is not good, proceed as follows
+
+2. check the transformation models and see which of these (if any) are good.
+
+3. find the best polynomial model using method described above.
+
+4. Choose as the best of the **good** models in 2) and 3) the one which has the highest $R^2$.
+
+Back to Electricity usage. We have found:
+
+- best transformation model is y vs log of x  with $R^2=82.9\%$
+
+- best polynomial model is the quadratic with $R^2=84.7\%$
+
+- so best overall is quadratic.
+
+**An important comment**
+
+Having a high $R^2$ is desirable, but neither necessary for a model to be good, nor an indication that a model is good:
+
+**Example** 1970's draft data:
+
+```{r, echo=FALSE}
+fit <- lm(Draft.Number~Day.of.Year, data=draft)
+ggplot(data=data.frame(Fits=fitted(fit),
+                        Residuals=residuals(fit)),
+        aes(Fits, Residuals)) +
+  geom_point() +
+  geom_abline(slope = 0)
+round(100*summary(fit)$r.squared, 1)
+```
+
+
+the linear model is a good one, even though it has a very low $R^2=5.1\%$
+
+**Example** fabric wear data:
+
+```{r, echo=FALSE}
+fit <- lm(Wear~Speed, data=fabricwear)
+ggplot(data=data.frame(Fits=fitted(fit),
+                        Residuals=residuals(fit)),
+        aes(Fits, Residuals)) +
+  geom_point() +
+  geom_abline(slope = 0)
+round(100*summary(fit)$r.squared, 1)
+```
+
+
+the linear model is bad, even though it has a fairly high $R^2=88.6\%$.
+
+#### **Example**: Lunatics in Massachusettes
+
+The data are from an 1854 survey conducted by the Massachusetts Commission on Lunacy (Mental disorder) under the leadership of Edward Jarvis. Dr. Jarvis was President of the American Statistical Association from 1852 to 1882.
+
+```{r}
+lunatics
+```
+
+We want to find a model to predict the percentage of lunatics kept at home by the distance to the nearest insane asylum.
+
+```{r}
+ggplot(data=lunatics, aes(Distance, Percent.at.Home)) +
+  geom_point() +
+  labs(x= "Percentage")
+```
+
+First we have a serious outlier. This turns out to be Nantucket, which is not a surprise because it is an island and people had to take a boat to get to the nearest asylum. We will therefore take Nantucket out of the data set:
+
+```{r}
+df <- data.frame(
+  Distance=lunatics$Distance[-13],
+  Percentage=lunatics$Percent.at.Home[-13])
+df <- df[order(df$Distance), ]
+```
+
+```{r}
+ggplot(data=df, aes(Distance, Percentage)) +
+  geom_point() 
+```
+
+
+```{r}
+fits <- as.list(1:5)
+for(i in 1:5) {
+  fits[[i]] <- lm(Percentage~poly(Distance, i),
+                  data=df)
+  print(ggplot(data=data.frame(Fits=fitted(fits[[i]]),
+                        Residuals=residuals(fits[[i]])),
+        aes(Fits, Residuals)) +
+     geom_point() +
+     geom_abline(slope = 0))
+  cat("Degree =", i, "\n")
+  cat("R^2 =", 
+      round(100*summary(fits[[i]])$r.squared, 1), "\n")
+  if(i>1) 
+    cat("p value =", 
+        round(anova(fits[[i]], fits[[i-1]])[[6]][2], 3))
+}
+``` 
+
+so we find that the polynomial of degree 4 is statisticially significantly better than the cubic on (p=0.027) but the degree 5 is not stat. signif. better than the degree 4 one (p=0.782). So we will use degree 4.
+
+What does this model look like?
+
+
+```{r}
+fit <- lm(Percentage~poly(Distance, 4), data=df)
+x <- seq(1, 99, length=100)
+df1 <- data.frame(x=x, 
+        y=predict(fit, newdata=data.frame(Distance=x)))
+ggplot(data=df, aes(Distance, Percentage)) +
+  geom_point() +
+  geom_line(data=df1, aes(x, y),
+            color="blue", size=1.2)
+```
+
+and this is not all that good either, the curve on the right of x=75 is basically determined by one observation and the bump at x=85 is an artifact of a power 4 model.

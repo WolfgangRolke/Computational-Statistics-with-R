@@ -1,0 +1,158 @@
+---
+title: Nonlinear Parametric Models
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+Sometimes the model we wish to fit is known, up to parameters. Generally that is the case if there is a scientific theory that predicts the shape of the relationship. For example, radioactive decay is known to be exponential: $y=\alpha e^{-\beta t}$
+
+#### **Example**: Growth of Lobsters
+
+Data from an experiment to raise Florida lobster in a controlled environment. The data shows the overall length and the age of a certain species of lobster.
+
+```{r}
+ggplot(data=lobster, aes(Time, Length)) +
+  geom_point()
+```
+
+Now biology suggests that the relationship should be of the form
+
+$$
+y=\frac{\beta_2}{1+(\beta_2 - \beta_0)/\beta_0 \exp (\beta_1 t)} + \epsilon
+$$
+where
+
+-  $\beta_0$ is the expected value of y at time t=0  
+-  $\beta_1$ is a measure of the growth rate  
+-  $\beta_2$ is the expected limit of y as $t\rightarrow \infty$
+
+This is often called the **logistic** or **autocatalytic** model
+
+How do we fit such a model, that is find "optimal" values of $\beta_0$, $\beta_1$ and $\beta_2$? Sometimes it is possible use transformations to "linearize" the model, for example we have of course $\log (y)= \log(\alpha)-\beta t$ for the radioactive decay model. This is not possible, though, for the logistic model, so we have to find a different solution.
+
+Previously we have always used the method of least squares to estimate the parameters in our models, that is we minimized the "figure of merit"
+
+$$
+\text{RSS} = \sum (y_i - \beta_0 - \beta_1 x_i)^2
+$$
+the natural extension of this is to use
+
+$$
+\text{RSS} = \sum (y_i - f(x_i; \boldsymbol{\beta}  ))^2
+$$
+
+now for a linear model minimizing this expression could be done with *lm*. This however is still a minimiziation problem, and we can do it  with 
+
+```{r}
+fit <- nls(Length ~ beta[3]/(1 + ((beta[3] -
+          beta[1])/beta[1]) *  exp(beta[2] * Time)), 
+          start = list(beta = c(10, -0.1, 500)), 
+          data = lobster)
+summary(fit)
+```
+
+```{r}
+x <- seq(10, 160, 1)
+df <- data.frame(x=x, 
+                 y = predict(fit, 
+                  newdata = data.frame(Time = x)))
+```
+
+```{r}
+ ggplot(data=lobster, aes(Time, Length)) +
+  geom_point() +
+  geom_line(data=df, aes(x, y), color="blue")
+```
+                
+#### **Example**: Prime Number Theorem
+
+That there were infinitely many prime numbers was first proven by the Greek mathematician Euclid at around 300BC. A serious study of how fast they grow was first begun by [Adrienne-Marie Legendre](https://www.britannica.com/biography/Adrien-Marie-Legendre). He studied the function N(k), which gives the number of primes less or equal to k. We can do the same. The primes up to 1,000,000 are available at
+
+```{r}
+primes <- scan("C://Users//Wolfgang//dropbox//teaching//Computing-with-R//primes.txt")
+primes <- as.integer(primes)
+```
+
+A detailed study of these primes led Legendre in 1798 to propose the function
+
+$$
+N(k)=k/(\log k - \alpha)
+$$
+Here is what that looks like for several values of $\alpha$:
+
+```{r}
+N <- function(k, alpha) {
+  k/(log(k)-alpha)
+}
+k <- seq(1000, 1e6, length=250)
+exact.counts <- k
+for(i in 1:250) 
+  exact.counts[i] <- sum(primes<k[i])
+df <- data.frame(N=c(k, k, k, k), 
+      Counts=c(exact.counts, N(k, 0), N(k, 1), N(k, 2)),
+      Method=rep(c("Counts", "a=0", "a=1", "a=2"),
+                 each=250))
+ggplot(df, aes(N, Counts, color=Method)) +
+  geom_line()
+```
+
+and so it seems a value of $\alpha=1$ is good.
+
+Legendre however was not satisfied with that, he wanted to find the optimal answer. So he found the least squares solution!
+
+```{r}
+fit <- nls(exact.counts ~ k/(log(k) - alpha), 
+          start = list(alpha = 0))
+coef(fit)
+```
+
+and so he claimed that 
+
+$$
+N(k)=k/(\log k - 1.08)
+$$
+
+Around the same time German mathematician [Carl Friedrich Gauss](https://www.britannica.com/biography/Carl-Friedrich-Gauss) also looked at this problem, and he made a different conjecture. He said
+
+$$
+N(k)=k/\log k 
+$$
+That was a rather strange guess, because it looks like this:
+
+```{r}
+N <- function(k, alpha) {
+  k/(log(k)-alpha)
+}
+k <- seq(1000, 1e6, length=250)
+exact.counts <- k
+for(i in 1:250) 
+  exact.counts[i] <- sum(primes<k[i])
+df <- data.frame(N=c(k, k), 
+      Counts=c(exact.counts, N(k, 0)),
+      Method=rep(c("Counts", "Gauss"),   each=250))
+ggplot(df, aes(N, Counts, color=Method)) +
+  geom_line()
+```
+
+and it surely looks like the two curves are growing further apart. However, almost 100 years later in 1896 the French mathematicians Jacques-Salomon Hadamard and Charles de la Valée Poussin independently showed that Gauss was right!
+
+From our modern point of view we might say Legendre was guilty  of **over-fitting**!
+

@@ -1,0 +1,850 @@
+---
+title: ANOVA with more than one factor
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+library(wolfr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+ANOVA can be viewed as a linear model in the following way: Say we have a quantitative response variable y and  a categorical predictor $x$. Then 
+
+$$
+y_{ij} = \mu + \alpha_i + \epsilon_{ij}
+$$
+so the $ij^{th}$ observation comes from an overall mean $\mu$, a contribution $\alpha_i$ due to the fact that this observation comes from the $i^{th}$ group and an error term.
+
+With this formalism the null hypothesis is
+
+$$
+H_0: \alpha_1=..=\alpha_k=0
+$$
+Now this extends naturally to more than one predictor. Say there are two, then
+
+
+$$
+y_{ijk} = \mu + \alpha_i + \beta_j + \gamma_{ij} + \epsilon_{ijk}
+$$
+
+Notice the new term $\gamma_{ij}$. It is meant to measure *interaction*, that is a possible relationship (*association*) between the factors. 
+
+If there is no such relationship, the modle simplifies to an *additive* model:
+
+$$
+y_{ijk} = \mu + \alpha_i + \beta_j +  \epsilon_{ijk}
+$$
+
+
+#### **Example**: Testing Hearing Aids
+
+Reference: Loven, Faith. (1981). A Study of the Interlist Equivalency of the CID W-22 Word List Presented in Quiet and in Noise. Unpublished MS Thesis, University of Iowa.
+
+Description: Percent of a Standard 50-word list heard correctly in the presence of background noise. 24 subjects with normal hearing listened to standard audiology tapes of English words at low volume with a noisy background. They repeated the words and were scored correct or incorrect in their perception of the words. The order of list presentation was randomized.
+
+The word lists are standard audiology tools for assessing hearing. They are calibrated to be equally difficult to perceive. However, the original calibration was performed with normal-hearing subjects and no noise background. The experimenter wished to determine whether the lists were still equally difficult to understand in the presence of a noisy background.
+
+```{r}
+head(hearingaid)
+```
+
+**Notice** that the values in both Subject and List are NOT numbers but labels, so both of them are categorical!
+
+Because there are two factors this is called a **twoway ANOVA**. More specifically, this is a **Randomized Block design** with List as the factor and Subject as a blocking variable because the factor Subject is not of interest in itself.
+
+Let's start by looking at the boxplots. Because neither List nor Subject has an obvious ordering we use size:
+
+```{r echo=FALSE}
+attach(hearingaid)
+```
+
+
+```{r}
+tmp <- tapply(hearingaid$Score, hearingaid$List, mean)
+hearingaid$List <- factor(hearingaid$List,              
+                          levels=order(tmp), 
+                          ordered = TRUE)
+tmp <- tapply(hearingaid$Score, hearingaid$Subject, mean)
+hearingaid$Subject <- factor(hearingaid$Subject, 
+                             levels=order(tmp), 
+                             ordered = TRUE)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ggplot(data=hearingaid, aes(List, Score)) +
+         geom_boxplot(),
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=hearingaid, aes(Subject, Score)) +
+        geom_boxplot() ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))    
+```
+
+this shows why we should include Subject in the analysis: it has a large variation.
+
+The summary statistics are:
+
+```{r}
+sum.tbl <-
+  data.frame(
+    List=c(3, 4, 2, 1),
+    n=as.integer(tapply(hearingaid$Score,
+               hearingaid$List,length)),
+    Mean=round(tapply(hearingaid$Score, 
+                       hearingaid$List, mean), 1),
+    Sd=round(tapply(hearingaid$Score, 
+                    hearingaid$List, sd), 2)
+)
+rownames(sum.tbl) <- NULL
+```
+
+```{r echo=FALSE}
+if(opts_knit$get("rmarkdown.pandoc.to")=="latex")
+  kable(sum.tbl)
+if(opts_knit$get("rmarkdown.pandoc.to")=="html")
+  kable.nice(sum.tbl)
+```
+
+```{r eval=FALSE}
+kable.nice(sum.tbl)
+```
+
+Because Subject is the blocking variable one would normally not include a table of summary statistics.
+
+Now for the test, or better tests, because we can in general test for either Subject or List. The routine we will use is again *aov*:
+
+```{r}
+fit <- aov(Score~., data=hearingaid) 
+summary(fit)           
+```
+
+So we have two tests, one for List and one for Subject. However, only the one for List is of interest:
+
+1) Parameters of interest: List group means    
+2) Method of analysis: ANOVA   
+3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+4) Type I error probability $\alpha=0.05$    
+5) Null hypothesis H~0~: $\mu_1 = .. =\mu_4$ (List groups have the same means)  
+6) Alternative hypothesis H~a~: $\mu_i \ne \mu_j$ (at least two List groups have different   means)   
+7) p value=0.00   
+8) 0.000<0.05, there is some evidence that the group means are not the same, that List means are different)  
+
+As always we need to check the assumptions:
+
+-  **normal residuals**
+
+The normal plot of residuals looks fine.
+
+```{r}
+df <- data.frame(Residuals=resid(fit), 
+                 Fits = fitted(fit))
+ggplot(data=df, aes(sample=Residuals)) +
+  geom_qq() +geom_qq_line()
+```
+
+
+-  **equal variance**
+
+In a oneway ANOVA we could just find the group standard deviations and compare them. Now (and in general if there is more than one factor) this is no longer a good idea, mainy because there are to many factor level combinations (4*24 here) and not enough observations for each (one here). Instead we will do the same as in the regression case, namely check the residual vs. fits plot for a change in spread from left to right. 
+
+```{r}
+ggplot(data=df, aes(Fits, Residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+
+again, everything looks fine.
+
+Notice that the ANOVA table also has the test for the Subject means. This is not very interesting, the boxplot already makes it clear that different subjects have very different hearing abilities. If that were not so, we would eliminate Subject and run a oneway ANOVA.
+
+Because we now have two factors, we need to worry about an additional problem, namely whether or not there is a relationship between the two factors. This is called **interaction**.
+
+To check we can draw the **interaction plot**.
+
+
+```{r, echo=FALSE}
+A <- rep(1:2, 30)
+B <- rep(1:3, each=20) 
+set.seed(5)
+y <- round(10 + A + ifelse(B==3, 2, B) + rnorm(60), 2)
+iplot(y, B, A)
+```
+
+What is drawn here? First we find the *mean response* for each factor-level combination. Then plot those points vs. one of the factors and finally connect the dots that belong to the other factor.
+
+Here the line segments are almost parallel. This implies that for any value of the factor A going from one value of B to the next adds **the same** amount to the response. So if we go from B=1 to B=2 **both** lines move up by about 2.0, and if we go from B=2 to B=3 **both** lines move down by 0.75.
+
+Because of this we call such a model **additive**
+
+Now consider the following interactions plot:
+```{r, echo=FALSE}
+A <- rep(1:2, 30)
+B <- rep(1:3, each=20)
+set.seed(3)
+y <- round(10 + A + B + ifelse(A==1, 1, -1)*B + rnorm(60), 2)
+iplot(y, B, A)
+```
+
+Here as we go from B=2 to B=3 the line goes up by 4 **if A=1** but it goes down by 0.5 **if A=1**.
+
+Deciding from the graph whether or not there is interaction is not always easy. Here are four interaction plots from a simulated data set, all guaranteed NOT to have any interaction:
+
+```{r, echo=FALSE}
+A <- rep(1:2, 3)
+B <- rep(1:3, each=2)
+y <- round(10 + A + B + rnorm(6), 2)
+plt1 <- iplot(y, B, A, return.graph = TRUE)
+y <- round(10 + A + B + rnorm(6), 2)
+plt2 <- iplot(y, B, A, return.graph = TRUE)
+y <- round(10 + A + B + rnorm(6), 2)
+plt3 <- iplot(y, B, A, return.graph = TRUE)
+y <- round(10 + A + B + rnorm(6), 2)
+plt4 <- iplot(y, B, A, return.graph = TRUE)
+multiple.graphs(plt1, plt2, plt3, plt4)
+```
+
+This is even worse because in ANOVA problems we often have very small data sets, so there is a great amount of variation in these graphs from sample to sample.
+
+So it would be nice if we could actually test for interaction, but that requires **repeated measurements**.
+
+In the hearing aid data we only have one observation for each combination of Subject and List, so we need to decide on the basis of the interaction plot:
+
+```{r}
+ggplot(data = hearingaid,
+       aes(Subject , Score, 
+           colour = List, group=List)) +
+      stat_summary(fun.y=mean, geom="point")+
+      stat_summary(fun.y=mean, geom="line")
+```
+
+There seems to be interaction between Lists and Subjects
+
+Finally, it would of course be interesting to study just which lists are different, that is we could do a **multiple comparison**:
+
+```{r}
+TukeyHSD(fit)$List
+```
+
+so List 1 is statistically signifcantly different from Lists 3 and 4. 
+
+No other differences are statistically significant.
+
+Because Subject is only a blocking variable we won't a multiple comparison for it.
+
+#### **Example**: Gasoline Type and Milage
+
+In an experiment to study gas milage four different blends of gasoline are tested in each of three makes of automobiles. The cars are driven a fixed distance to determine the mpg (miles per gallon) The experiment is repeated three times for each blend-automobile combination. (Taken from Lyman Ott)
+  
+Note that the interest here is indifferent gasoline blends, automobile is a blocking variable, so this is a randomized block design.
+
+Gasoline is numbers, but these are just codes for different blends, so it is a categorical variable or factor.
+
+```{r echo=FALSE}
+attach(gasoline)
+```
+
+```{r}
+
+head(gasoline)
+```
+
+Here is an interesting calculation:
+
+```{r}
+table(gasoline$Gasoline, gasoline$Automobile)
+```
+
+This shows us two things: 
+
+1.  we have *repeated measurements* (several observations per factor-level combination)
+
+2.  we have a *balanced design* (the same number of repetitions in each factor-level combination)
+
+This second feature used to be quite important because the calculations in a balanced design are much simpler. Nowadays with fast computers this is not important anymore. There are still good reasons why you want to design your experiment to have a balanced design if possible, though!
+
+```{r}
+tmp <- tapply(gasoline$MPG, gasoline$Gasoline, mean)
+gasoline$Gasoline <- factor(gasoline$Gasoline, 
+                            levels=order(tmp), 
+                            ordered = TRUE)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ggplot(data=gasoline, aes(Gasoline, MPG)) +
+         geom_boxplot() ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=gasoline, aes(Automobile, MPG)) + 
+        geom_boxplot() ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))      
+```
+
+the boxplots suggest a difference between blends but not between automobiles.
+  
+The summary statistics are
+
+```{r}
+sum.tbl <-
+  data.frame(
+    Gasoline=c(4, 2, 3, 1),
+    n=as.integer(tapply(gasoline$MPG, 
+                        gasoline$Gasoline,length)),
+    Mean=round(tapply(gasoline$MPG, 
+                      gasoline$Gasoline, mean), 1),
+    Sd=round(tapply(gasoline$MPG, 
+                    gasoline$Gasoline, sd), 2)
+)
+rownames(sum.tbl) <- NULL
+```
+
+
+```{r echo=FALSE}
+if(opts_knit$get("rmarkdown.pandoc.to")=="latex")
+  kable(sum.tbl)
+if(opts_knit$get("rmarkdown.pandoc.to")=="html")
+  kable.nice(sum.tbl)
+```
+
+```{r eval=FALSE}
+kable.nice(sum.tbl)
+```
+
+**Interaction:**
+
+```{r}
+ggplot(data = gasoline,
+       aes(Automobile , MPG, 
+           colour = Gasoline, group=Gasoline)) +
+      stat_summary(fun.y=mean, geom="point")+
+      stat_summary(fun.y=mean, geom="line")
+```
+
+Lines are (almost) parallel, so there is no indication of interaction. We have **repeated measurements** (3 per factor-level combination), so we can test for this:
+
+```{r}
+fit <- aov(MPG~Gasoline*Automobile, data=gasoline)
+summary(fit)
+```
+
+1) Parameters of interest: Interaction    
+2) Method of analysis: ANOVA  
+3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+4) Type I error probability $\alpha$=0.05  
+5) Null hypothesis H~0~ : no interaction  
+6) Alternative hypothesis H~a~: some interaction  
+7) p value = 0.1854 
+8) 0.1854 > 0.05, there is no evidence of interaction.
+
+So we will now proceed without the interaction term:  
+
+```{r}
+fit <- aov(MPG~., data=gasoline)
+summary(fit)
+```
+
+let's check the assumptions:
+
+```{r}
+df <- data.frame(Residuals=resid(fit), 
+                 Fits = fitted(fit))
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ggplot(data=df, aes(sample=Residuals)) +
+  geom_qq() +geom_qq_line(),
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=df, aes(Fits, Residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0),
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))
+```
+
+the plots look fine, so no problem with the assumptions.
+
+Now let's test for the factors:
+
+Test for Factor Gasoline:
+
+1) Parameters of interest: means of gasoline groups  
+2) Method of analysis: ANOVA  
+3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+4) Type I error probability $\alpha$ = 0.05  
+5) Null hypothesis H~0~ : $\mu_1 = .. = \mu_4$ (Gasoline groups have the same means)   
+6) Alternative hypothesis H~a~: $\mu_i \ne \mu_j$ (Gasoline groups have different means)   
+7) p value=0.000   
+8) 0.000<0.05, there is some evidence of differences in gasoline blends
+ 
+Test for Factor Automobile is not really needed because this is a blocking variable.
+
+Notice that if we included the interaction the p-value for Automobile was 0.08, without the interaction it is 0.1. One advantage of being able to fit an additive model is that often it makes the conclusions stronger. 
+
+
+```{r}
+TukeyHSD(fit)$Gasoline
+```
+
+so all blends are stat. significantly different, with blend 1 having the highest miles per gallon.
+
+
+#### **Example**: Film Thickness in Semiconductor Production
+
+Chemical vapor deposition is a process used in the semiconductor industry to deposit thin films of silicon dioxide and photoresit on substrates of wafers as they are manufactured. The films must be as thin as possible and have a uniform thickness, which is measured by a process called infrared interference. A process engineer wants to evaluate a low-pressure chemical vapor deposition process that reduces costs and increases productivity. The engineer has set up an experiment to study the effect of chamber temperature and pressure on film thickness.
+
+```{r echo=FALSE}
+attach(filmcoatings)
+```
+
+
+```{r}
+head(filmcoatings)
+table(Temperature, Pressure)
+```
+
+so again we have balanced design with repeated measurements
+
+```{r}
+filmcoatings$Temperature <-
+  factor(filmcoatings$Temperature, 
+  levels=unique(filmcoatings$Temperature),
+  ordered=TRUE)
+filmcoatings$Pressure <-
+  factor(filmcoatings$Pressure, 
+  levels=unique(filmcoatings$Pressure),
+  ordered=TRUE)
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ggplot(data=filmcoatings, 
+             aes(Temperature, Thickness)) + 
+         geom_boxplot(),
+vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=filmcoatings, 
+             aes(Pressure, Thickness)) +
+         geom_boxplot(),
+ vp=viewport(layout.pos.row=1, layout.pos.col=2))       
+```
+
+Unlike in the hearing aid or gasoline experiments, here we equally interested in both factors. This type of experiment is called a **factorial design** problem.
+
+For us there is no practical difference between a randomized block design and a factorial design but the distinction can be important in other analyses.
+
+```{r}
+sum.tbl <-
+  data.frame(
+    Temperature=unique(filmcoatings$Temperature),
+    n=as.integer(tapply(filmcoatings$Thickness,
+             filmcoatings$Temperature,length)),
+    Mean=round(tapply(filmcoatings$Thickness,
+             filmcoatings$Temperature, mean), 1),
+    Sd=round(tapply(filmcoatings$Thickness,
+             filmcoatings$Temperature, sd), 2)
+)
+rownames(sum.tbl) <- NULL
+```
+
+
+```{r echo=FALSE}
+if(opts_knit$get("rmarkdown.pandoc.to")=="latex")
+  kable(sum.tbl)
+if(opts_knit$get("rmarkdown.pandoc.to")=="html")
+  kable.nice(sum.tbl)
+```
+
+```{r eval=FALSE}
+kable.nice(sum.tbl)
+```
+
+
+```{r}
+sum.tbl <-
+  data.frame(
+    Pressure=unique(filmcoatings$Pressure),
+    n=as.integer(tapply(filmcoatings$Thickness,
+             filmcoatings$Pressure,length)),
+    Mean=round(tapply(filmcoatings$Thickness,
+             filmcoatings$Pressure, mean), 1),
+    Sd=round(tapply(filmcoatings$Thickness,
+             filmcoatings$Pressure, sd), 2)
+)
+rownames(sum.tbl) <- NULL
+```
+
+
+```{r echo=FALSE}
+if(opts_knit$get("rmarkdown.pandoc.to")=="latex")
+  kable(sum.tbl)
+if(opts_knit$get("rmarkdown.pandoc.to")=="html")
+  kable.nice(sum.tbl)
+```
+
+```{r eval=FALSE}
+kable.nice(sum.tbl)
+```
+
+**Interaction**
+```{r}
+ggplot(data = filmcoatings,
+       aes(Temperature, Thickness , 
+           colour = Pressure, group=Pressure)) +
+      stat_summary(fun.y=mean, geom="point")+
+      stat_summary(fun.y=mean, geom="line")
+```
+The lines are not all parallel, so there is likely some interaction. Again we have **repeated measurements** (3 per factor-level combination), so we can actually test for this:
+
+```{r}
+fit <- aov(Thickness~Temperature*Pressure,
+           data=filmcoatings)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+print(ggplot(data=df, aes(sample=Residuals)) +
+           geom_qq() + geom_qq_line(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0),
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+```
+the graphs show that there are no problems with the assumptions.
+
+```{r}
+summary(fit)
+```
+
+Test for Interaction:
+
+1) Parameters of interest: Interaction  
+2) Method of analysis: ANOVA  
+3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+4) Type I error probability $\alpha = 0.05$  
+5) Null hypothesis H~0~ : no interaction  
+6) Alternative hypothesis H~a~: some interaction  
+7) p value = 0.0124  
+8) 0.0124<0.05, there is some evidence of interaction  
+
+
+Test for Factor Temperature:
+
+1) Parameters of interest: means of temperature groups  
+2) Method of analysis: ANOVA  
+3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+4) Type I error probability $\alpha = 0.05$  
+5) Null hypothesis H~0~ :   $\mu_1 = \mu_2 = \mu_3$  (Temperature groups have the same means)  
+6) Alternative hypothesis H~a~:   $\mu_i \ne \mu_j$ (Temperature groups have different means)  
+7) p value = 0.000  
+8) 0.000 < 0.05, there is some evidence of differences in temperature  
+
+Test for Factor Pressure:
+
+1) Parameters of interest: means of pressure groups  
+  2) Method of analysis: ANOVA  
+  3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+  4) Type I error probability $\alpha = 0.05$  
+  5) Null hypothesis H~0~ : $\mu_1 = \mu_2 = \mu_3$ (Pressure groups have the same means)  
+  6) Alternative hypothesis H~a~: $\mu_i \ne \mu_j$ (Pressure groups have different means)  
+  7) p value = 0.000  
+  8) 0.000<0.05, there is some evidence of differences in pressure
+  
+Finally, what we need is to find the best combination of pressure and temperature. So what we want is a multiple comparison for Temperature and Pressure (not either of them alone!). Easily done:
+
+```{r}
+out <- TukeyHSD(fit)[[3]]
+out
+```
+
+This is bit hard to read. Recall that we are only interested in small values of Thickness. Let's redo the interaction plot:
+
+```{r}
+ggplot(data = filmcoatings,
+       aes(Temperature, Thickness , 
+           colour = Pressure, group=Pressure)) +
+      stat_summary(fun.y=mean, geom="point")+
+      stat_summary(fun.y=mean, geom="line")
+```
+
+so we see that that the best combination is Temperature=High, Pressure=Mid.
+
+The next-best is Temperature=Mid, Pressure=Low. What does Tukey say about the comparison of these?
+
+```{r error=TRUE}
+out["High:Mid-Mid:Low", ]
+```
+
+so they are NOT statistically significant.
+
+Let's check the next couple of combinations:
+
+```{r error=TRUE}
+out["High:Mid-High:Low", ]
+out["High:Mid-Mid:Mid", ]
+out["Mid:High-High:Mid", ]
+```
+
+and now we have a stat. significant difference.
+
+Notice that in the last one we have to change the order, because Tukey did as well.
+
+So either of the four combinations (High Mid,  Mid Low, High Low or Mid Mid), at least not at these sample sizes.
+
+
+`r hl()$hr()`
+
+A simple idea for solving this problem seems to be this one:
+
+1. find the best temperature:
+```{r}
+sort(round(tapply(Thickness, Temperature, mean), 1))
+```
+so Temperature=High is best
+
+2. find the best pressure:
+```{r}
+sort(round(tapply(Thickness, Pressure, mean), 1))
+```
+
+so Pressure=Low is best
+
+3.  take the combination: Pressure=Low, Temperature=High is best!
+Except it is not: we saw before that Pressure=Mid, Temperature=High
+is best.
+
+This simple idea does not work because of the presence of interaction. 
+
+#### **Example**: Water Quality and Mining
+
+The effects of mining and rock type on water quality.
+
+
+```{r echo=FALSE}
+attach(mines)
+```
+
+```{r}
+head(mines)
+table(Rock, Mine)
+mines$Mine <- factor(mines$Mine,
+        levels = c("Unmined", "Reclaimed", "Abandoned"),
+        ordered = TRUE)
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ggplot(data=mines, aes(Rock, Iron)) + 
+         geom_boxplot(),
+vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(mines, aes(Mine, Iron)) +
+         geom_boxplot(),
+ vp=viewport(layout.pos.row=1, layout.pos.col=2))
+```
+
+
+We have a clear problem with outliers (aka the normal assumption), so we try the log transform:
+
+```{r}
+mines$log.iron <- log(mines$Iron)
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ggplot(data=mines, aes(Rock, log.iron)) + 
+         geom_boxplot(),
+vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(mines, aes(Mine, log.iron)) +
+         geom_boxplot(),
+ vp=viewport(layout.pos.row=1, layout.pos.col=2))
+
+```
+
+This has solved the problem, so the analysis will be based on log.iron.
+
+**Summary Statistics**
+
+Because we use a transformation we will base the tables on Median and IQR
+
+```{r}
+sum.tbl <-
+  data.frame(
+    Mine=levels(mines$Mine),
+    n=as.integer(tapply(mines$Iron,
+             mines$Mine,length)),
+    Median=round(tapply(mines$Iron,
+             mines$Mine, median), 1),
+    IQR=round(tapply(mines$Iron,
+             mines$Mine, IQR), 2)
+)
+rownames(sum.tbl) <- NULL
+```
+
+```{r echo=FALSE}
+if(opts_knit$get("rmarkdown.pandoc.to")=="latex")
+  kable(sum.tbl)
+if(opts_knit$get("rmarkdown.pandoc.to")=="html")
+  kable.nice(sum.tbl)
+```
+
+```{r eval=FALSE}
+kable.nice(sum.tbl)
+```
+
+
+Note that the IQR's are very different. This is because this data set has a lot of outliers which still effect the IQR. 
+
+**Interaction**
+```{r}
+ggplot(data = mines,
+       aes(Rock , log.iron, 
+           colour = Mine, group=Mine)) +
+      stat_summary(fun.y=mean, geom="point")+
+      stat_summary(fun.y=mean, geom="line")
+```
+ 
+There seems to be some interaction. To confirm this test for it:
+
+```{r}
+fit <- aov(log.iron~Rock*Mine, data=mines)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+print(ggplot(data=df, aes(sample=Residuals)) +
+           geom_qq() + geom_qq_line(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0),
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+```
+
+assumptions are ok (after log transform!)
+
+```{r}
+summary(fit)
+```
+
+
+Test for Interaction:
+
+1) Parameters of interest: Interaction  
+2) Method of analysis: ANOVA  
+3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+4) Type I error probability $\alpha = 0.05$  
+5) Null hypothesis H~0~ : no interaction  
+6) Alternative hypothesis H~a~: some interaction  
+7) p value = 0.000  
+8) 0.000<0.05, there is some evidence of interaction  
+Check the assumptions of ANOVA: both plots look ok
+
+Test for Factor Rock:
+
+1) Parameters of interest: means of pressure groups  
+2) Method of analysis: ANOVA  
+  3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+  4) Type I error probability $\alpha = 0.05$  
+  5) Null hypothesis H~0~ : $\mu_1~= \mu_2$ (Rock groups have the same means)  
+  6) Alternative hypothesis H~a~: $\mu_1 \ne \mu_2$ (Rock groups have different means)   
+  7) p value = 0.035  
+8) 0.035<0.05, there is some evidence of differences in Rock types.
+
+Test for Factor Mine: 
+
+1) Parameters of interest: means of pressure groups  
+  2) Method of analysis: ANOVA  
+  3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+  4) Type I error probability $\alpha = 0.05$  
+  5) Null hypothesis H~0~ : $\mu_1 = \mu_2 = \mu_3$ (Mine groups have the same means)  
+  6) Alternative hypothesis H~a~: $\mu_i \ne \mu_j$ (Mine groups have different  means)   
+  7) p value = 0.000   
+  8) 0.000<0.05, there is some evidence of differences in Mine types 
+  
+**Multiple Comparison** 
+The main interest is in mines, so
+
+```{r}
+TukeyHSD(fit)$Mine
+```
+  
+Interpretation: There is a stat. signif. difference between the mean iron content of abondoned mines and the others. The difference between unmined and reclaimed mines is not stat. sign, at least not at these sample sizes.
+
+
+```{r, echo=FALSE}
+detach(hearingaid)
+detach(gasoline)
+detach(filmcoatings)
+detach(mines)
+```
+
+#### **Example**: Air Filters and Noise
+
+The data are from a statement by Texaco, Inc. to the Air and Water Pollution Subcommittee of the Senate Public Works Committee on June 26, 1973. Mr. John McKinley, President of Texaco, cited the Octel filter, developed by Associated Octel Company as effective in reducing pollution. However, questions had been raised about the effects of pollution filters on aspects of vehicle performance, including noise levels. He referred to data presented in the datafile associated with this story as evidence that the Octel filter was was at least as good as a standard silencer in controlling vehicle noise levels. 
+
+```{r}
+head(airfilters)
+```
+
+```{r}
+airfilters$Size <- factor(airfilters$Size,
+                  levels = unique(airfilters$Size),
+                  ordered = TRUE)
+plt1 <- ggplot(data=airfilters, aes(Size, Noise)) +
+  geom_boxplot()
+plt2 <- ggplot(data=airfilters, aes(Filter, Noise)) +
+  geom_boxplot()
+plt3 <- ggplot(data=airfilters, aes(Side, Noise)) +
+  geom_boxplot()
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(plt1, 
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(plt2, 
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))
+print(plt3, 
+  vp=viewport(layout.pos.row=2, layout.pos.col=1))
+```
+
+it seems large cars are more quiet. Not much of an effect due to either side or filter.
+
+```{r}
+plt1 <- ggplot(data = airfilters,
+       aes(Size , Noise, 
+           colour = Filter, group=Filter)) +
+      stat_summary(fun.y=mean, geom="point")+
+      stat_summary(fun.y=mean, geom="line")
+plt2 <- ggplot(data = airfilters,
+       aes(Size , Noise, 
+           colour = Side, group=Side)) +
+      stat_summary(fun.y=mean, geom="point")+
+      stat_summary(fun.y=mean, geom="line")
+plt3 <- ggplot(data = airfilters,
+       aes(Side , Noise, 
+           colour = Filter, group=Filter)) +
+      stat_summary(fun.y=mean, geom="point")+
+      stat_summary(fun.y=mean, geom="line")
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(plt1, 
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(plt2, 
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))
+print(plt3, 
+  vp=viewport(layout.pos.row=2, layout.pos.col=1))
+```
+
+a possible interaction between Filter and Side
+
+```{r}
+fit <- aov(Noise~.^3, data=airfilters)
+summary(fit)
+```
+
+the three-way interaction is significant (p=0.000579), so we can not simplify this model.
+
+The main question here is whether there is a difference between the filters, and the answer is yeas (p=0.000). Because Filter has only two values a multiple comparison is not necessary.

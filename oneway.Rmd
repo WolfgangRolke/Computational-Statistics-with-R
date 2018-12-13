@@ -1,0 +1,218 @@
+---
+title: Comparing the Means of Several Populations - ANOVA
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+library(wolfr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+options(scipen = 999)
+```
+`r hl()$basefontsize()`
+
+
+#### **Example**: Mothers Cocain Use and Babies Health
+
+Are the mean lengths of the babies different depending on the drug use of the mother?
+
+```{r}
+ggplot(mothers, aes(Status, Length)) +
+         geom_boxplot()
+```
+
+```{r}
+out <- matrix(0, 3, 3)
+colnames(out) <- c("Size", "Mean", "SD")
+rownames(out) <- unique(mothers$Status)
+out[, 1] <- tapply(mothers$Length, 
+                   mothers$Status, length)
+out[, 2] <- round(tapply(mothers$Length, 
+                         mothers$Status, mean), 2)
+out[, 3] <- round(tapply(mothers$Length, 
+                         mothers$Status, sd), 2)
+```
+
+```{r echo=FALSE}
+if(opts_knit$get("rmarkdown.pandoc.to")=="latex")
+  kable(out)
+if(opts_knit$get("rmarkdown.pandoc.to")=="html")
+  kable.nice(out)
+```
+
+```{r eval=FALSE}
+kable.nice(out)
+```
+
+
+The standard method for this problem is called **ANOVA** (Analysis of Variance) and is run with the *aov* command. 
+```{r}
+fit <- aov(Length~Status, data=mothers)
+summary(fit)
+```
+
+
+1. Parameters of interest: group means 
+2. Method of analysis: ANOVA 
+3. Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+4. Type I error probability $\alpha$=0.05  
+5. Null hypothesis H~0~: $\mu_1 = \mu_2 = \mu_3$ (groups have the same means)  
+6. Alternative hypothesis H~a~: $\mu_i \ne \mu_j$ (at least two groups have different means)  
+7. p=0.0002  
+8. 0.0002 < 0.05, there is some evidence that the group means are not the same, the babies whose mothers used cocain tend to be a little shorter (less healthy?) 
+
+In step 3 we have the assumptions
+
+a. residuals have a normal distribution. W can check that with the normal plot. The residuals are the  simply the observations minus their group means and are part of the aov object.  
+
+```{r}
+df <- data.frame(x=resid(fit))
+ggplot(df, aes(sample=x)) +
+  stat_qq() + stat_qq_line()
+```
+
+looks fine
+
+b. groups have equal variance 
+
+Here one uses the rule of thumb: if the largest sample standard deviation is not more than three times the smalles, it is ok. 
+
+Here: 3*2.5 = 7.5 > 3.6, ok
+
+Often if the null of no difference is rejected, one wants to go a step further and do a pairwise comparison:
+
+-  is Drug Free different from First Trimester?  
+-  is First Trimester different from Throughout?
+
+There are a number of methods known for this problem, a popular one is by **Tukey**:
+
+```{r}
+tuk <- TukeyHSD(fit)
+plot(tuk)
+```
+
+this draws confidence intervals for the difference in means of all pairs. If an interval does not contain 0, the corresponding pair is statistically significantly different. 
+
+Here that is the case only for Drug Free - Throughout, so the other two pairs are not statistically significantly different. Remember, however that *failing to reject H~0~* is NOT the same as *accepting H~0~*. The fact that those pairs are not statistically significantly different is almost certainly due to a lack of sample size.
+
+#### **Example**: Cuckoo Eggs
+
+That cuckoo eggs were peculiar to the locality where found was already known in 1892. A study by E.B. Chance in 1940 called The Truth About the Cuckoo demonstrated that cuckoos return year after year to the same territory and lay their eggs in the nests of a particular host species. Further, cuckoos appear to mate only within their territory. Therefore, geographical sub-species are developed, each with a dominant foster-parent species, and natural selection has ensured the survival of cuckoos most fitted to lay eggs that would be adopted by a particular foster-parent species. The data has the lengths of cuckoo eggs found in the nests of six other bird species (drawn from the work of O.M. Latter in 1902).
+
+[Cuckoo Birds](https://en.wikipedia.org/wiki/Cuckoo)
+
+Basic question: is there a difference between the lengths of the cuckoo eggs of different Foster species?
+```{r echo=FALSE}
+attach(cuckoo)
+```
+
+```{r}
+head(cuckoo)
+table(cuckoo$Bird)
+```
+
+Here we have no obvious ordering of the groups. In this case the usual thing to do is to sort by the group means:
+
+```{r}
+mn <- sort(tapply(cuckoo$Length, cuckoo$Bird, mean))
+cuckoo$Bird <- factor(cuckoo$Bird,
+                      levels = unique(names(mn)),
+                      ordered = TRUE)
+```
+
+```{r}
+ggplot(data=cuckoo, aes(Bird, Length)) +
+  geom_boxplot()
+```
+
+we have some outliers in the Meadow Pipit species, but not to bad and we will ignore that.
+
+Let's look at the table of summary statistics. 
+```{r}
+out <- matrix(0, 6, 3)
+colnames(out) <- c("n", "Mean", "Sd")
+rownames(out) <- as.character(levels(cuckoo$Bird))
+out[, 1] <- tapply(cuckoo$Length, 
+                   cuckoo$Bird, length)
+out[, 2] <- round(tapply(cuckoo$Length, 
+                   cuckoo$Bird, mean), 2)
+out[, 3] <- round(tapply(cuckoo$Length, 
+                   cuckoo$Bird, sd), 2)
+```
+
+```{r echo=FALSE}
+if(opts_knit$get("rmarkdown.pandoc.to")=="latex")
+  kable(out)
+if(opts_knit$get("rmarkdown.pandoc.to")=="html")
+  kable.nice(out)
+```
+
+```{r eval=FALSE}
+kable.nice(out)
+```
+
+Both the graph and the table make it clear that there are some differences in the length, so the following is not really necessary:
+
+```{r}
+fit <- aov(Length~Bird, data=cuckoo)
+summary(fit)
+```
+
+1) Parameters of interest: group means  
+2) Method of analysis: ANOVA  
+3) Assumptions of Method: residuals have a normal distribution, groups have equal variance  
+4) $\alpha = 0.05$  
+5) Null hypothesis H~0~: $\mu_1 = ... = \mu_6$ (groups have the same means)  
+6) Alternative hypothesis H~a~: $\mu_i \ne \mu_j$ (at least two groups have different means)  
+7) p value = 0.000  
+8) 0.000 < 0.05, there is some evidence that the group means are not the same, the length are different for different foster species. 
+
+Assumptions of the method:  
+
+a) residuals have a normal distribution, plot looks (mostly) ok  
+
+```{r}
+df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+ggplot(data=df, aes(sample=Residuals)) +
+           geom_qq() + geom_qq_line()       
+```
+
+b) groups have equal variance  
+
+smallest stdev=0.7, largest stdev=1.1, 3*0.7=2.1>1.1, ok
+
+So, how exactly do they differ?
+
+```{r}
+tuk <- TukeyHSD(fit)
+print(tuk)
+```
+
+so the eggs of Wrens are the smallest, and they are stat. significantly smaller than the eggs of all other birds.
+
+Meadow Pipits are next, and they are stat. significantly smaller than the eggs of Tree Pipits and Hedge Sparrows.
+
+no other differences are stat. significant!
+
+This can get a bit hard to read, and it might be better to concentrate on those pairs that are stat. signif,. different at (say) the $5\%$ level:
+
+```{r}
+names(tuk[[1]][tuk[[1]][,4]<0.05, 4])
+```
+
+
+

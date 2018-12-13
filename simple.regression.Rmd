@@ -1,0 +1,260 @@
+---
+title: Simple Regression
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+In this chapter we will discuss so called linear models. These are models of the form
+
+$$
+Y=\beta_0 +\beta_1 x_1 +..+\beta_k x_k+\epsilon
+$$
+
+at first it seems rather restrictive to only consider linear models, but in fact these are quite general. For one, the models are linear in the parameters, so for example
+
+$$
+\begin{aligned}
+&Y    = a X^b\\
+&\log Y    = \log (ax^b) =\\
+&\log a + b \log x\\
+\end{aligned}
+$$
+
+is also a linear model!
+
+In this section we discuss *simple regression*, which means models with just one predictor.
+
+#### **Example**: Wine Consumption and Heart Desease
+
+data on wine consumption per person per year and deaths from heart desease per 100000, by country
+
+```{r}
+wine
+ggplot(wine, 
+       aes(Wine.Consumption, Heart.Disease.Deaths)) +
+  geom_point() +
+  labs(x="Wine Consumption", y="Deaths")
+```
+
+We want to fit a linear model, that is a straight line. We will use the **method of least squares**. The idea is as follows:
+
+say the model is  
+
+$$
+\text{heart disease} = 260-10\times \text{ wine consumption} 
+$$
+
+and we know that for a certain country (not in the dataset) wine consumtion is 3.7, then according to our model the heart disease rate should be about 
+
+$$
+\text{heart disease} = 260-10\times 3.7 = 223
+$$
+
+How do we find an equation? Well, to find some equation is easy:
+
+```{r, echo=FALSE}
+plt <- ggplot(wine, 
+       aes(Wine.Consumption, Heart.Disease.Deaths)) +
+  geom_point() +
+  labs(x="Wine Consumption", y="Deaths")
+print(plt+
+ geom_abline(intercept=260, slope=-10, size=1.1, colour="red")+
+ geom_abline(intercept=280, slope=-20, size=1.1, colour="green")+
+ geom_abline(intercept=270, slope=-24, size=1.1, colour="orange")+
+ geom_abline(intercept=260, slope=-23, size=1.1, colour="blue"))   
+```
+
+clearly the red line is not very good (to flat), the green one is better but still a bit to flat, but how about the orange and blue ones? Both look reasonably good. 
+
+Is there a way to find a line that is "best" ? The answer is yes. In order to understand how we need to following:
+
+Let's concentrate for a moment on the third line, which has the equation 
+
+$$
+\text{heart disease} = 270-24*\text{ wine consumption} 
+$$
+
+or short $y = 270-24x$ 
+
+The United States has a wine consumption of $x = 1.2$	liters and a heart disease rate of $y = 199$. Now if we did not know the heart disease rate we could use the equation and find
+
+$$
+y = 270-24x = 270-24*1.2 = 241
+$$
+
+Now we have 2 y's:
+
+- the one in the data ($y = 199$)   
+- the one from the equation ($y = 241$)
+
+Let distinguish between them by calling the first the **observed value** and the second one the **fitted value**. 
+
+Think of it in these terms: the fitted value is our guess, the observed value is the truth. So the difference between them is the **error** in our guess. We call this the **residual**: 
+
+$$
+\epsilon = \text{fitted} - \text{observed} = 241-199 = 42
+$$
+
+The line $y=270-24x$ **overestimates** the heart disease rate in the US by $42$.  
+
+If the line perfectly described the data, the residuals would all be 0:
+
+```{r, echo=FALSE}
+x <- 1:10
+splot(x, x, plotting.size=2, add.line=1)
+```
+
+This was done for the US, but of course we could do the same for all the countries in the dataset:
+
+```{r, echo=FALSE}
+fits <- 270-24*wine[,2]
+out <- cbind(wine, fits, wine[, 3]-fits)
+colnames(out)[2:5] <- c("Consumption", "Deaths", "Fits", "Residuals")
+kableExtra::kable(out)
+```
+
+so for each country our line makes an error. What we need is a way to find an **overall** error. The idea of least squares is to find the **sum of squares** of the residuals:
+$$
+RSS = \sum \epsilon^2
+$$
+In the case of our line we find 
+$$
+RSS = (-1.0)^2+9.4^2+..+33.2^2 = 25269.8
+$$
+In the same way we can find an RSS for any line:
+
+- y = 280-10x , RSS = 71893  
+- y = 260-20x , RSS = 40738  
+- y = 260-23x , RSS = 24399.7  
+
+notice that the first two, which we said were not so good, have a higher RSS. So it seems that the lower the RSS, the better. Is there a line with the smallest RSS possible? The answer is again yes, using the method of **Least Squares** for which we have the routine:
+
+```{r fig.show='hide'}
+fit <- lm(Heart.Disease.Deaths~Wine.Consumption,
+    data=wine)
+round(fit$coef, 2)
+```
+
+The least squares regression equation is:
+
+$$
+\text{heart disease}  = 260.56 - 22.97 \text{ wine consumption}
+$$
+
+very close to the last of our equations.
+
+What is its RSS? It is not part of the output, but I can tell you it is 24391.
+
+A nice graph to visualize the model is the scatterplot with the least squares regression line, called the **fitted line plot** 
+  
+```{r}
+plt +
+  geom_smooth(method = "lm", se=FALSE)
+```
+
+## Alternatives to Least Squares
+
+Instead of minimizing the sum of squares we could also have 
+
+-  minimized the largest absolut residual  
+-  minimized the sum of the absolut residuals  
+-  some other figure of merit.
+
+Historically least squares was use mostly because it could be done analytically:
+
+$$
+\begin{aligned}
+&\frac{d}{d \beta_0}  \sum \left(y_i - \beta_0 - \beta_1  x_i\right)^2  = \\
+&(-2)\sum \left(y_i - \beta_0 - \beta_1  x_i\right)    = \\
+&(-2) \left( \sum y_i - n\beta_0 - \beta_1  \sum x_i\right)    = 0\\
+&\hat{\beta_0} = \bar{y}-\beta_1 \bar{x}
+\end{aligned}
+$$
+and the same for $\beta_1$. These days we can use pretty much any criterion we want:
+
+```{r}
+fit.abs <- function(beta) 
+  sum(abs(wine$Heart.Disease.Deaths
+          -beta[1]-beta[2]*wine$Wine.Consumption))
+round(nlm(fit.abs, c(260, -23))$estimate, 2)
+```
+
+```{r}
+plt +
+  geom_smooth(method = "lm", se=FALSE) +
+  geom_abline(slope = -18.46, 
+              intercept = 239, color="red")
+```
+
+This is often called the $L_1$ regression. This also implemented in
+
+```{r}
+library(robustbase)
+X <- cbind(1, wine$Wine.Consumption)
+lmrob.lar(X, wine$Heart.Disease.Deaths)$coefficients
+```
+
+which uses a much better algorithm based on the simplex method.
+
+One way to understand the difference between these two is the following: let's use least squares/absolute value to estimate the mean!
+
+So we have the model 
+
+$$
+Y=\beta_0 + \epsilon
+$$
+
+Using least square (now with $\beta_1=0$) yields as above $\hat{\beta_0}=\bar{y}$, the sample mean. What does absolute error give? It can be shown that it leads to the median!
+
+Just as the median is a robust (aka does not depend so much on outliers) estimator than the mean, $L_1$ estimation also is more robust.
+
+#### **Example**: artificial example
+
+```{r echo=FALSE}
+set.seed(111)
+```
+
+
+```{r}
+x <- 1:20
+y1 <- x + rnorm(20, 0, 1.5)
+y2 <- y1 + rnorm(20, 0, 0.1)
+y2[1] <- 20
+df <- data.frame(x=c(x, x), y=c(y1, y2), 
+          which=rep(c("with Outlier", "Without Outlier"), each=20))
+lm1 <- coef(lm(y1~x))
+lm2 <- coef(lm(y2~x))
+l11 <- lmrob.lar(cbind(1, x), y1)$coefficients
+l12 <- lmrob.lar(cbind(1, x), y2)$coefficients
+print(lm1)
+ggplot(df, aes(x, y, color=which)) +
+  geom_point() +
+  geom_abline(intercept = lm1[1], slope = lm1[2], color="blue") +
+  geom_abline(intercept = lm2[1], slope = lm2[2], color="blue") +
+  geom_abline(intercept = l11[1], slope = l11[2], color="red") +
+  geom_abline(intercept = l12[1], slope = l12[2], color="red")   
+```
+
+and we see that the effect of the outlier is much larger on the least squares regression than on the $L_1$.
+
+## ANOVA
+
+notice that ANOVA can also be viewed as a linear model, where the predictor variable is categorical. The main difference is that the "model" there is found via the likelihood ratio test rather than least squares and that the main interest is in hypothesis testing rather than prediction. 

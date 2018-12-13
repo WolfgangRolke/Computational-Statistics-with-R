@@ -1,0 +1,350 @@
+---
+title: Introduction to Classification
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+In general classification is concerend with the following problem: our population consists of several distinct groups. We have a set of data points from each group with associated measurements. We want to derive a procedure that tells us which group a new observation might belong to.
+
+#### **Example**: Fisher's Iris Data
+
+One of the most famous data sets in Statistics was first studied by Fisher, his [iris](https://en.wikipedia.org/wiki/Iris_flower_data_set) data. For each of three types of iris flowers (Iris setosa, Iris virginica and Iris versicolor) we have four measurements: the lengths and the widths of the Petal and the Sepal. The goal is to determine from these measurements the type of flower.
+
+```{r}
+head(iris)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(3, 3)))
+print(ggplot(data=iris, 
+          aes(Sepal.Length, Sepal.Width, color=Species)) +
+      geom_point() + theme(legend.position="none"),
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=iris, 
+         aes(Sepal.Length, Petal.Length, color=Species)) +
+      geom_point() + theme(legend.position="none"),
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))
+print(ggplot(data=iris, 
+             aes(Sepal.Length, Petal.Width, color=Species)) +
+      geom_point() + theme(legend.position="none"),
+  vp=viewport(layout.pos.row=1, layout.pos.col=3))
+print(ggplot(data=iris, 
+             aes(Sepal.Width, Petal.Length, color=Species)) +
+      geom_point() + theme(legend.position="none"),
+  vp=viewport(layout.pos.row=2, layout.pos.col=2))
+print(ggplot(data=iris, 
+             aes(Sepal.Width, Petal.Width, color=Species)) +
+      geom_point() + theme(legend.position="none"),
+  vp=viewport(layout.pos.row=2, layout.pos.col=3))
+print(ggplot(data=iris, 
+             aes(Petal.Length, Petal.Width, color=Species)) +
+      geom_point() + theme(legend.position="none"),
+  vp=viewport(layout.pos.row=3, layout.pos.col=3))
+```
+
+
+#### **Example**: 
+
+Consider the following artificial examples:
+
+-  two types, fairly simple separation
+
+```{r}
+library(mvtnorm)
+ex1 <- function(mu=2, n=50) {
+  x1 <- rmvnorm(n, mean=c(0,0), sigma=diag(2)) 
+  x2 <- rmvnorm(n, mean=c(mu,mu), sigma=diag(2)) 
+  data.frame(x=c(x1[, 1], x2[, 1]), 
+             y=c(x1[, 2], x2[, 2]), 
+             group=rep(c("A", "B"), each=n))
+}
+```
+
+```{r}
+ggplot(data=ex1(n=150), aes(x, y,color=group)) +
+  geom_point() +
+  theme(legend.position="none")
+```
+
+-  two types, more complicated separation
+
+```{r}
+ex2 <- function(mu=2, n=50) {
+  x <- cbind(runif(10000), runif(10000, -1, 1))
+  x <- x[x[, 1]^2 + x[, 2]^2<1, ]
+  x <- x[1:n, ]
+  y <- cbind(runif(10000, 0, 2), runif(10000, -2, 2))
+  y <- y[y[, 1]^2 + y[, 2]^2>0.9, ]
+  y <- y[1:n, ]
+  data.frame(x=c(x[, 1], y[, 1]), 
+             y=c(x[, 2], y[, 2]), 
+             group=rep(c("A", "B"), each=n))
+}
+```
+
+```{r}
+ggplot(data=ex2(n=150), aes(x, y,color=group)) +
+  geom_point() +
+  theme(legend.position="none")
+```
+
+-  three types
+
+```{r}
+ex3 <- function(mu=2, n=33) {
+  x1 <- rmvnorm(n, mean=c(0, 0), sigma=diag(2)) 
+  x2 <- rmvnorm(n, mean=c(mu, mu), sigma=diag(2)) 
+  x3 <- rmvnorm(n, mean=2*c(mu, mu), sigma=diag(2))
+  data.frame(x=c(x1[, 1], x2[, 1], x3[, 1]), 
+             y=c(x1[, 2], x2[, 2], x3[, 2]), 
+             group=rep(c("A", "B", "C"), each=n))
+}
+```
+
+```{r}
+ggplot(data=ex3(n=150), aes(x, y,color=group)) +
+  geom_point() +
+  theme(legend.position="none")
+```
+
+`r hl()$hr()`
+In one sense this is not a new problem, it is simply a regression problem where the response variable is discrete.
+
+For this we could code a response variable y as 0 if "green" and 1 if "red" if there are two groups (models 1 and 2) or with 0, 1 and 2 if there are three groups (model 3). Then we run the linear regression of y on x1 and x2.
+
+Finally we assign a point (x1, x2) to "green" if its predicted response is <0.5, and to "red" otherwise for models 1 and 2, and depending on whether its predicted response is <2/3 or >4/3 for model 3.
+
+Of course in the case of two groups we could also use *logistic regression*, but we won't pursue this idea here.
+
+To see what this looks like we find an even spaced grid and predict the color for each point. Then we overlay that grid onto the graph. This is done in
+
+```{r}
+make.grid <- function(df) {
+  x <- seq(min(df$x), max(df$x), length=100)
+  y <- seq(min(df$y), max(df$y), length=100)
+  expand.grid(x=x, y=y) 
+}
+do.graph <- function() {
+  print(ggplot(data=df, aes(x, y, color=group)) +
+   geom_point(size=2) +
+   theme(legend.position="none") +
+   geom_point(data=df1, 
+             aes(x,y, color=group, alpha=0.1),
+             inherits.aes=FALSE)) 
+} 
+```
+
+Here our three examples:
+
+```{r}
+df <- ex1()
+df$Code <- ifelse(df$group=="A", 0, 1)
+fit <- lm(Code~x+y, data=df)
+df1 <- make.grid(df)
+df1$group <- ifelse(predict(fit, df1)<0.5, "A", "B")
+do.graph()
+```
+
+
+```{r}
+df <- ex2()
+df$Code <- ifelse(df$group=="A", 0, 1)
+fit <- lm(Code~x+y, data=df)
+df1 <- make.grid(df)
+df1$group <- ifelse(predict(fit, df1)<0.5, "A", "B")
+do.graph() 
+```
+
+```{r}
+df <- ex3()
+df$Code <- ifelse(df$group=="A", 0, 1)
+df$Code[df$group=="C"] <- 2
+fit <- lm(Code~x+y, data=df)
+df1 <- make.grid(df)
+tmp <- predict(fit, df1)
+df1$group <- ifelse(tmp<2/3, "A", "B")
+df1$group[tmp>4/3] <-"C"
+do.graph()
+```
+
+this seems to work ok for examples 1 and 3, not so much for 2.
+
+we will use these examples quite a bit, so
+
+```{r}
+gen.ex <- function(which, n=50) {
+  if(which==1) 
+      df <- ex1(n=n)
+  if(which==2) 
+      df <- ex2(n=n)  
+  if(which==3) 
+      df <- ex3(n=n)  
+  df$Code <- ifelse(df$group=="A", 0, 1)
+  if(which==3) 
+    df$Code[df$group=="C"] <- 2
+  df
+}
+```
+
+
+Let's have a closer look at example 1:
+
+```{r}
+df <- gen.ex(1)
+fit <- lm(Code~x+y, data=df)
+coef(fit)
+```
+
+we assign the group depending if the fitted value is < or > than 0.5. What do we get if it is equal to 0.5?
+
+$$
+\begin{aligned}
+& 0.5   = \beta_0 +\beta_1 x+ \beta_2 y\\
+& y   = (0.5 - \beta_0 -\beta_1 x)/\beta_2 \\
+& y = \frac{0.5-\beta_1}{\beta_2}-\frac{\beta_1}{\beta_2}x
+\end{aligned}
+$$
+Let's add that line to the graph:
+
+```{r}
+ggplot(data=df, aes(x, y, color=group)) +
+  geom_point(size=2) +
+  theme(legend.position="none") +
+  geom_abline(intercept = (0.5-coef(fit)[2])/coef(fit)[3],
+              slope=-coef(fit)[2]/coef(fit)[3])
+```
+
+and this is called the *decision boundary*.
+
+It is easy to see that in example 3 it works like this:
+
+```{r}
+df <- gen.ex(3)
+fit <- lm(Code~x+y, data=df)
+ggplot(data=df, aes(x, y, color=group)) +
+  geom_point(size=2) +
+  theme(legend.position="none") +
+  geom_abline(intercept = (2/3-coef(fit)[2])/coef(fit)[3],
+              slope=-coef(fit)[2]/coef(fit)[3]) +
+  geom_abline(intercept = (4/3-coef(fit)[2])/coef(fit)[3],
+              slope=-coef(fit)[2]/coef(fit)[3])
+```
+
+`r hl()$hr()`
+
+One thing that sets a classification problem apart from regression is that here we have an obvious way to judge how good a method is, namely the **miss-classification rate**: What percentage of the observations are given the wrong label?
+
+Let's see:
+
+```{r}
+msr <- function(x, y) {
+  z <- table(x, y)
+  round((sum(z)-sum(diag(z)))/sum(z)*100, 1)
+}
+```
+
+
+```{r}
+df <- gen.ex(1, n=1000)
+fit <- lm(Code~x+y, data=df)
+pred <- ifelse(predict(fit)<0.5, "A", "B")
+table(df$group, pred)
+msr(df$group, pred)
+```
+
+
+```{r}
+df <- gen.ex(2, n=1000)
+fit <- lm(Code~x+y, data=df)
+pred <- ifelse(predict(fit)<0.5, "A", "B")
+msr(df$group, pred)
+```
+
+
+```{r}
+df <- gen.ex(3, n=1000)
+fit <- lm(Code~x+y, data=df)
+tmp <- predict(fit)
+pred <- ifelse(tmp<2/3, "A", "B")
+pred[tmp>4/3] <- "C"
+msr(df$group, pred)
+```
+
+Of course these misclassification rates are to optimistic: we calculated it on the same data set that we fit on. We should always *train* and *test* on different data sets, maybe using cross-validation:
+
+```{r}
+df <- gen.ex(1, n=1000)
+out <- rep(0, 10)
+for(i in 1:10) {
+  I <- sample(1:2000, size=400)
+  fit <- lm(Code~x+y, data=df[-I, ])
+  pred <- ifelse(predict(fit, df[I, 1:2])<0.5, "A", "B")
+  out[i] <- msr(df$group[I], pred) 
+}
+mean(out)
+```
+
+Here we split the data into $80\%$ for training and $20\%$ for evaluation. Is this a good split? Actually, nobody knows!
+
+`r hl()$hr()`
+
+Our method works quite well for examples 1 and 3, but not so much for example 2.
+
+```{r}
+df <- gen.ex(2)
+df$Code <- ifelse(df$group=="A", 0, 1)
+fit <- lm(Code~x+y, data=df)
+df1 <- make.grid(df)
+df1$group <- ifelse(predict(fit, df1)<0.5, "A", "B")
+do.graph()
+```
+
+shows us why: here a linear decision boundary clearly won't work. So how about a quadratic one?
+
+```{r}
+df$x2 <- df$x^2
+df$y2 <- df$y^2
+df$xy <- df$x*df$y
+fit <- lm(Code~x+y+x2+y2+xy, data=df)
+df1 <- make.grid(df)
+df1$x2 <- df1$x^2
+df1$y2 <- df1$y^2
+df1$xy <- df1$x*df1$y
+df1$group <- ifelse(predict(fit, df1)<0.5, "A", "B")
+do.graph()
+```
+
+and that looks much better!
+
+Here is the mcr based on cross-validation:
+
+```{r}
+df <- df[, c(4, 1:2, 5:7)]
+out <- rep(0, 10)
+for(i in 1:10) {
+  I <- sample(1:2000, size=400)
+  fit <- lm(Code~x+y+x2+y2+xy, data=df[-I, ])
+  pred <- ifelse(predict(fit, df[I, -1])<0.5, "A", "B")
+  out[i] <- msr(df$Code[I], pred) 
+}
+mean(out)
+```
+

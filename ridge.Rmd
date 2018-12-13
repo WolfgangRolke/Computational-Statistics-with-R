@@ -1,0 +1,231 @@
+---
+title: Subset Selection and Ridge Regression
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+We have previously discussed the issue of subset selection. There we use Mallow's C~p~ Statitstic to find the best model. This calculates all possible models, and if there are k predictors there are $2^k$ such models. Although there are very fast algorithms available for this, it is not feasable to do it for much more than 30 predictors. So what do we do if we have more than that?
+
+## Forward/Backward Selection
+
+One idea is as follows:
+
+1.  Fit the model with no predictors.
+2.  Find which predictor improves the model the most (somehow)  
+3.  If this predictor improves the fit statistically significantly, add it and go back to 2.
+4.  Stop
+
+There are routines in R to do these steps.
+
+#### **Example**: Pollution and Mortality
+
+First we need to fix the non-normal predictors:
+
+```{r}
+newair <- airpollution[, -16] #take out NOxPot
+newair[, c(10, 13, 14)] <- log(newair[, c(10, 13, 14)])
+colnames(newair)[c(10, 13, 14)] <- 
+  c("log.Pop", "log.HCPot", "log.NOx")
+```
+
+Next we fit the model with no predictor. Of course that just finds the mean of Mortality, but we need the corresponding *lm* object.
+
+```{r }
+fit <- lm(Mortality~1, data=newair) 
+```
+
+How do we decide which predictor (if any) to add to the model? We can use the *add1* command and the so called $F$ statistic:
+
+```{r}
+add1(fit, formula(newair), test="F")
+```
+
+so the predictor with the highest F statistics (40.9) is NonWhite and it is statistically significant (p=0.000), so we add it to the list of predictors:
+
+```{r}
+fit <- update(fit, .~.+NonWhite)
+coef(fit)
+```
+
+Here and in what follows I use the $F$ statistic as a criterion. There are others, some included in the *add1* routine such as *AIC* or *Akaike's information criterion*. Which criterion to use is a rather tricky question.
+
+Next:
+
+```{r}
+tmp <- add1(fit, formula(newair), test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==max(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.+Education)
+tmp <- add1(fit, formula(newair), test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==max(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.+JanTemp)
+tmp <- add1(fit, formula(newair), test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==max(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.+SO2Pot)
+tmp <- add1(fit, formula(newair), test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==max(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.+Rain)
+tmp <- add1(fit, formula(newair), test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==max(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.+log.NOx)
+tmp <- add1(fit, formula(newair), test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==max(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+```
+
+and the next predictor is not stat. significant, so we stop.
+
+Notice that this is **not** the same model that we found using Mallow's C~p~, which used JanTemp, Rain, PopDensity, NonWhite, WhiteCollar and LOGT(NOx). 
+
+An alternative to forward selection is its reverse, backward selection. Here we start with the full model and remove predictors until there are only significant predicotrs left:
+
+Here is the backward solution:
+
+```{r}
+fit <- lm(Mortality~., data=newair)
+drop1(fit, test="F")
+```
+
+now the predictor with the smallest F value is log.Pop, so we drop it:
+
+```{r}
+fit <- update(fit, .~.-log.Pop)
+tmp <- drop1(fit, test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==min(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.-Income)
+tmp <- drop1(fit, test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==min(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.-RelHum)
+tmp <- drop1(fit, test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==min(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.-SO2Pot)
+tmp <- drop1(fit, test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==min(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.-JulyTemp)
+tmp <- drop1(fit, test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==min(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.-PopDensity)
+tmp <- drop1(fit, test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==min(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.-log.HCPot)
+tmp <- drop1(fit, test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==min(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.-Pop.House)
+tmp <- drop1(fit, test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==min(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+fit <- update(fit, .~.-WhiteCollar)
+tmp <- drop1(fit, test="F")
+k <- seq_along(tmp[[5]][-1])[tmp[[5]][-1] ==min(tmp[[5]][-1])]
+cat(rownames(tmp)[k+1], ", F = ", tmp[[5]][k+1], ", p value = ", tmp[[6]][k+1],"\n")
+```
+
+and now the p value is less than 0.05, so we stop.
+
+This results in a model with predictors
+
+```{r}
+rownames(tmp)[-1]
+```
+
+which is not the same as either best subset or forward selection.
+
+Finally, there is the method of *stepwise selection*. Here in each step we either add or drop a variable. The *step* command does it for us. Notice that it uses *AIC* by default.
+
+```{r}
+fit <- lm(Mortality~., data=newair)
+step(fit)
+```
+
+this seems the easiest to use (certainly in terms of what we have to type into R) but it is important to understand that none of these methods works all the time. For each of them there are examples were they lead to quite bad final models.
+
+There has been a lot of research on the relative merits of these methods. There are in fact many Statisticians who advise against their use. As an alternative we can consider
+
+## Ridge Regression
+
+One problem with the above methods is that they are all or nothing: a predictor either is in the final model or is not. Ridge regression takes a different approach: each variable gets a "weight" in how much it contributes to the final model.
+
+Recall the least squares regression method: we minimize the least squares criterion
+
+$$
+\sum_{i=1}^n \left( y_i - \beta_0 -\sum_{j-1}^k \beta_jx_{ij} \right)^2
+$$
+
+in ridge regression we use the criterion
+
+$$
+\sum_{i=1}^n \left( y_i - \beta_0 -\sum_{j-1}^p \beta_jx_{ij}\right)^2 + \lambda \sum_{j-1}^p \beta_j^2 
+$$
+
+What does this do? The term $\sum_{j-1}^p \beta_j^2$ will depend mainly on the largest $\beta$'s. Because this term is added in and we are minimizing this expression we essentially *penalize* large $\beta$'s. Overall these coefficients will be *shrunk* towards 0. For this reason ridge regression is a *shrinkage* method. Such method have become quite popular in many areas of Statistics.
+
+In the literature such methods are also refered to as *penalized likelihood* methods.
+
+$\lambda$ is a parameter that controls the amount of shrinkage. If $\lambda=0$ we are back at OLS. 
+
+How do we fit such a model? 
+
+```{r}
+library(ridge)
+fit <- linearRidge(Mortality~., data=newair)
+summary(fit)
+```
+
+An alternative to ridge regression is the *Lasso*. It uses
+
+$$
+\sum_{i=1}^n \left( y_i - \beta_0 -\sum_{j-1}^p \beta_jx_{ij}\right)^2 + \lambda \sum_{j-1}^p |\beta_j| 
+$$
+
+In modern terminology, the Lasso uses an $L^1$ penality whereas ridge regression uses $L^2$.
+
+The Lasso can be fit with
+
+```{r}
+library(glmnet)
+X <- data.matrix(newair[, -1])
+y <- newair$Mortality
+fit <- cv.glmnet(X, y, standardize=TRUE,
+                type.measure="mse", nfolds = 5, alpha=1)
+plot(fit)
+cf <- as.numeric(coef(fit, s=fit$lambda.1se))
+names(cf) <- c("Intercept", colnames(X))
+cf
+```
+
+One advantage of the lasso is that it can yield coefficients that are 0, and clearly any predictor whose coefficient is 0 can be dropped:
+
+```{r}
+cf[abs(cf)>0]
+```
+
+As a very general guideline, if the goal is subset selection use the lasso. If the goal is prediction use ridge regression.

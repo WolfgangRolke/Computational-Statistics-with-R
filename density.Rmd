@@ -1,0 +1,385 @@
+---
+title: Nonparametric Density Estimation
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+#### **Example**: Old Faithful Guyser
+
+Let's have a look at the waiting times:
+
+```{r}
+bw <- diff(range(faithful$Waiting.Time))/50 
+ggplot(faithful, aes(Waiting.Time)) +
+geom_histogram(color = "black", 
+    fill = "white", 
+    binwidth = bw) + 
+    labs(x = "x", y = "Counts")
+```    
+
+clearly the distribution of this data is non standard. We previously fit a mixture of normal densities to the data. In this section we will consider several non parametric methods. The basic problem is to estimate the density $f(x)$ by $\hat{f}(x)$ for each x.
+
+## Kernel Density Estimation.
+
+The most commonly used method is called *kernel density estimation*. The idea is to average over the data points, giving greater weight to points near x. In general we have
+
+$$
+\hat{f}(x)=\frac1n \sum K(\frac{x-X_i}{h})
+$$
+
+here K is kernel function and h is a tuning parameter. 
+
+This is implemented in
+
+```{r}
+fit <- density(faithful$Waiting.Time)
+```
+
+```{r}
+ggplot(faithful, aes(Waiting.Time)) +
+  geom_histogram(aes(y = ..density..), 
+    color = "black", 
+    fill = "white", 
+    binwidth = bw) + 
+    labs(x = "x", y = "Density") +
+  geom_line(data=data.frame(x=fit$x, y=fit$y), 
+            aes(x, y), color="blue")
+```    
+
+this uses a normal density as the kernel function. It has several formulas implemented for the choice of h. The default uses
+
+```{r}
+bw.nrd0(faithful$Waiting.Time)
+```
+
+but it is often recommended to change that to
+
+```{r}
+bw.SJ(faithful$Waiting.Time)
+```
+a method by Sheather and Jones
+
+here are several:  
+```{r}
+fit1 <- density(faithful$Waiting.Time, bw=1.5)
+fit2 <- density(faithful$Waiting.Time, bw=10)
+ggplot(faithful, aes(Waiting.Time)) +
+geom_histogram(aes(y = ..density..), 
+    color = "black", 
+    fill = "white", 
+    binwidth = bw) + 
+    labs(x = "x", y = "Density") +
+  geom_line(data=data.frame(x=fit$x, y=fit$y), 
+            aes(x, y), color="blue") +
+  geom_line(data=data.frame(x=fit1$x, y=fit1$y), 
+            aes(x, y), color="red")  +
+  geom_line(data=data.frame(x=fit2$x, y=fit2$y), 
+            aes(x, y), color="green")  
+```    
+
+and it is clear that for small values of h we get a very ragged (under-smoothed) estimate whereas for an h to large it is the other way around.
+
+## Other Methods
+
+There is a long list of density estimation methods and associated routines. For a review see [Density estimation in R](https://vita.had.co.nz/papers/density-estimation.pdf). Two libraries worth knowing about are
+
+### ASH
+
+this stands for *averaged and shifted histograms*, an idea due to Scott (1992).
+
+```{r message=FALSE}
+library(ash)
+fit <- ash1(bin1(faithful$Waiting.Time))
+ggplot(faithful, aes(Waiting.Time)) +
+  geom_histogram(aes(y = ..density..), 
+    color = "black", 
+    fill = "white", 
+    binwidth = bw) + 
+    labs(x = "x", y = "Density") +
+  geom_line(data=data.frame(x=fit$x, y=fit$y), 
+            aes(x, y), color="blue")
+```
+
+### KernSmooth
+
+a method due to Wand & Jones (1995). It's main advantage is that it also works for higher dimensional data.
+
+```{r}
+library(KernSmooth)
+data(geyser, package="MASS")
+x <- cbind(geyser$duration, geyser$waiting)
+est <- bkde2D(x, bandwidth=c(0.7, 7))
+contour(est$x1, est$x2, est$fhat)
+persp(est$fhat)
+```
+
+## Boundary Problem
+
+Most methods encounter problems when the true density does not go to 0 at the edges:
+
+```{r}
+df <- data.frame(x=rexp(1000, 1))
+fit <- density(df$x)
+bw <- diff(range(df$x))/50 
+df1 <- data.frame(x=seq(0, 6, length=100),
+                  y=exp(-seq(0, 6, length=100)))
+ggplot(df, aes(x)) +
+  geom_histogram(aes(y = ..density..), 
+    color = "black", 
+    fill = "white", 
+    binwidth = bw) + 
+    labs(x = "x", y = "Density") +
+  geom_line(data=data.frame(x=fit$x, y=fit$y), 
+            aes(x, y), color="blue") +
+  geom_line(data=df1, 
+            aes(x, y), color="black")
+```
+
+the reason is clear: The formula expects data on both sides of x, but in this case at x=0 there is data only on one side.
+
+A simple solution is to "mirror"  the data:
+
+```{r}
+fit <- density(c(df$x, -df$x))
+fit$y <- 2*fit$y[fit$x>0]
+fit$x <- fit$x[fit$x>0]
+bw <- diff(range(df$x))/50 
+ggplot(df, aes(x)) +
+  geom_histogram(aes(y = ..density..), 
+    color = "black", 
+    fill = "white", 
+    binwidth = bw) + 
+    labs(x = "x", y = "Density") +
+  geom_line(data=data.frame(x=fit$x, y=fit$y), 
+            aes(x, y), color="blue") +
+  geom_line(data=df1, 
+            aes(x, y), color="black")
+```
+
+notice the factor of 2, which is needed to scale the density to integrate to 1. In general this rescaling can be difficult.
+
+This would work perfectly fine for a density that has slope 0 at the boundary points, for example a uniform. It still is wrong in our case, because our density has slope -1.
+
+Other more complicated solutions are known but none of them is very satisfactory. 
+
+### Smooth Bootstrap
+
+There is a version of the Bootstrap that can be helpful at times. The idea is to sample from a non-parametric density estimate instead of the empirical distribution function. For this however we would need to discuss how to simulate from a general distribution function. Come to ESMA 5015  Simulation next time!
+
+#### **Example**: Hidalgo stamps
+
+A well known data set in statistics has the thicknesses (espesor) in millimeters of 485 Mexican stamps (sello) printed in 1872-1874, from the 1872 [Hidalgo issue](https://en.wikipedia.org/wiki/Postage_stamps_and_postal_history_of_Mexico#Hidalgo_issue_1872). 
+
+It is thought that the stamps from this issue are a "mixture" of different types of paper, of different thicknesses. Can we determine from the data how many different types of paper were used?
+
+Let's start with 
+
+```{r}
+bw <- diff(range(stamps))/50 
+df <- data.frame(Thickness=stamps)
+ggplot(df, aes(Thickness)) +
+geom_histogram(color = "black", 
+    fill = "white", 
+    binwidth = bw) + 
+    labs(x = "x", y = "Counts")
+```    
+
+which seems to have at least two modes. This judgement however is tricky because it depends on the number of bins we use.
+
+An alternative is to use a frequency polygon
+
+```{r}
+ggplot(df, aes(Thickness)) +
+  geom_freqpoly()
+```
+
+which seems to suggest a much larger number of modes.
+
+Let's instead draw the graph using a nonparametric density estimate:
+
+```{r}
+ggplot(df, aes(Thickness)) +
+  stat_density(geom="line")
+```
+
+here it seems again like there are two modes, but this depends largely on the chosen bandwith:
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ggplot(df, aes(Thickness)) +
+   stat_density(geom="line", bw=0.01)  ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))        
+print(ggplot(df, aes(Thickness)) +
+   stat_density(geom="line", bw=0.001) +ylab("")  ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))
+```
+
+stat_density implements a kernel density estimator as discussed above, whith choices of different kernels and bandwidth selectors. In what follows we will need to explicitely calculate these estimates and use the density routine.
+
+From the above it is clear that the number of modes depends on the choice of h. It is possible to show that the number of modes is a non-increasing function of h. At the extremes we would have a simple normal distribution with one mode (h large and on the other a sharply peaked mode at each observation (h tiny)
+
+Let's say we want to test 
+$$
+H_0: \text{number of modes}=1 \text{ vs. } H_a: \text{number of modes}>1
+$$
+Because the number of modes is a non-increasing function of h there exists an $h_1$ such that the density estimator has one mode for $h<h_1$ and two or more modes for $h>h_1$. Playing around with 
+
+```{r}
+fhat <- function(h, t, dta=stamps) {
+  tmp <- density(dta, bw=h)
+  df <- data.frame(x=tmp$x, y=tmp$y)
+  if(missing(t)) return(df)
+  out <- approx(df, xout=t)$y   
+  out[!is.na(out)]
+}
+draw.fhat <- function(h)
+  ggplot(fhat(h), aes(x, y)) + geom_line()
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(draw.fhat(0.01) ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(draw.fhat(0.005) ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+print(draw.fhat(0.0075) ,
+  vp=viewport(layout.pos.row=2, layout.pos.col=1))
+print(draw.fhat(0.0068) ,
+  vp=viewport(layout.pos.row=2, layout.pos.col=2))        
+```
+
+we find $h_1 \sim 0.0068$.
+
+Is there a way to calculate the number of modes for a given h? here is one: 
+
+-  calculate $y_i=\hat{f}(t_i;h)$ on a grid $t_1,..t_k$  
+-  calculate $z_i=y_i-1-y_i$ and note that at a mode z will change from positive to negative   
+-  number of modes = $\sum I[z_i>0 \text{ and } z_{i+1}<0]$
+
+Let's write a simple routine that automates the process. It uses a bisection algorithm.
+
+```{r}
+x.points <- seq(min(stamps), max(stamps), length = 250)
+calc.num.mode = function(y) {
+  m <- length(y) - 1
+  z <- diff(y)
+  sum(ifelse(z[-m] >= 0 & z[-1] < 0, 1, 0))
+}
+find.h <- function(num.modes, h=0.007, Show=FALSE) {
+  repeat {
+    h <- h-0.001
+    if(Show)
+      cat("h =", h, " modes=", 
+          calc.num.mode(fhat(h, x.points)), "\n")
+    if(calc.num.mode(fhat(h, x.points)) >= num.modes)               break
+  }
+  low <- h
+  high <- h + 0.001
+  repeat {
+    h <- (low+high)/2
+    if(Show)
+      cat("h =", h, " modes=", 
+          calc.num.mode(fhat(h, x.points)), "\n")
+    if(calc.num.mode(fhat(h, x.points)) < num.modes) 
+      high <- h
+    else 
+      low <- h
+    if(high-low<10^-7) 
+      break
+  }
+  h
+}
+```
+
+
+```{r}
+h1 <- find.h(1, Show = TRUE)
+h5 <- find.h(5)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(draw.fhat(h1) ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(draw.fhat(h5) ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+
+```
+
+So, how we can test 
+
+$$
+H_0: \text{number of modes}=1 \text{ vs. } H_a: \text{number of modes}>1
+$$
+Here it is: 
+
+-  draw B bootstrap samples of size n from fhat(h1) 
+-  for each find $h_1^{*}$, the smallest h for which this bootstrap sample has just 1 mode  
+-  approximate p-value of test is the proportion of $h_1^{*} > h_1$.
+
+the idea is this; if there is indeed just one mode, then in the bootstrap samples $h_1^{*}$ should be around $h_1$ and so this proportions shouldn't be to small.
+
+Notice we don't actually need $h_1^{*}$, we just need to check if $h_1^{*}>h_1$, which is the case if $\hat{f}(x^{*}; h_1^{*})$ has at least two modes. 
+
+Note that we are not drawing bootstrap samples from "stamps" but from a density estimate, $\hat{f}$. So this is an example of the *smooth bootstrap* mentioned above. 
+
+How do we draw from fhat? It can be shown that if $y_1^{*},.., y_n^{*}$ is a bootstrap sample from the data, then a smooth bootstrap sample is given by
+
+$$
+x_i^{*}=\bar{y^{*}} +(1+h_1^{*}/s^2)^{-1/2}(y_i^{*}-\bar{y^{*}}+h_1^{*}\epsilon_i)
+$$
+where $\epsilon_i \sim N(0,1)$
+
+```{r}
+test.modes <- function(k) {
+  h <- find.h(k+1)
+  q <- 1/sqrt((1 + h^2/var(stamps)))
+  B <- 1000
+  hstar <- rep(0, B)
+  for (i in 1:B) {
+    ystar <- sample(stamps, size = 485, replace = TRUE)
+    xstar <- mean(ystar) + q*(ystar-mean(ystar) + 
+                h*rnorm(485))
+    y <- fhat(h, x.points, dta=xstar)
+    if (calc.num.mode(y) > k) 
+        hstar[i] <- 1
+  }
+  length(hstar[hstar > h])/B  
+}
+test.modes(1)
+```
+
+and so we find strong evidence against the null, there are more than one modes.
+
+The same method works for testing 
+
+$$
+H_0: \text{number of modes}=k \text{ vs. } H_a: \text{number of modes}>k
+$$
+
+and we find
+
+```{r cache=TRUE}
+for(k in 2:9) 
+  cat("k =", k, ", p =", test.modes(k),"\n")
+```
+
+So there are certainly more than one mode, with a chance for as many 7.

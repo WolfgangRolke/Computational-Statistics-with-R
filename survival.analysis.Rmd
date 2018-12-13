@@ -1,0 +1,469 @@
+---
+title:  Survival Analysis
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+Survival Analysis is concerned with the distributions of lifetimes, often human as in Medical Sciences but also of components and machines.
+
+#### **Example**: Life Table USA
+
+Here is a *life table*, for the USA in 2016. Numbers are per 100,000 population:
+
+```{r}
+life.us <- read.csv("us.life.table.csv")
+kableExtra::kable(life.us)
+```
+
+so this tells us that of any 100,000 men 97148.16 survived to age 30, or about $2850/100000*100\% = 2.8\% had died, compared to $1.5\%$ of the women. 
+
+Tables like this are very important to insurance companies when trying to figure out what premiums to charge for a life insurance, or for a company to find out how much their employees need to pay into a retirement plan, etc.
+
+Let's draw a curve that for each gender and age shows the proportion of the population alive.
+
+First we need to reorganize the data as a data frame with numeric columns:
+
+```{r}
+dim(life.us)
+life.us.1 <-
+  data.frame(Age=rep(c(0, 2.5+5*0:16, 87), 2),
+             Alive=c(life.us$Male, life.us$Female)/1e5,
+             Gender=rep(c("Male", "Female"), each=19))
+```
+
+and now
+
+```{r}
+ggplot(data=life.us.1, aes(Age, Alive, color=Gender)) +
+    geom_line()
+```
+
+What does this say how many newborn male babies we might have in a certain population? How may 1 year olds and so on? Let's assume our population consists of 100000 individuals, half male and female. Then the numbers in the table tell us the relative probabilities. For example for any 200 babies there should be about 98.8 20-24 year old males and 63.5 80-84 year old females. So we can generate a simulated population with 
+
+```{r}
+sim.pop <- list(Male=sample(c(0, 2.5+5*0:16, 87), 
+   size=50000, replace = TRUE, prob=life.us$Male),
+                Female=sample(c(0, 2.5+5*0:16, 87), 
+   size=50000, replace = TRUE, prob=life.us$Female))
+df <- data.frame(x=c(sim.pop$Male, sim.pop$Female),
+      Gender=rep(c("Male", "Female"), each=50000))       
+ggplot(df, aes(x=x)) + 
+    geom_histogram(data = subset(df, Gender == "Male"), 
+        fill = "red", alpha = 0.2) +
+    geom_histogram(data = subset(df, Gender == "Female"), 
+        fill = "blue", alpha = 0.2)
+```
+
+
+`r hl()$hr()`
+
+Let T denote a random variable describing a lifetime. Then we know that T takes values x>0 and T has a continuous distribution F with density f. In survival analysis several functions are of common interest:
+
+-  survivor function:  
+$$
+S(t)=1-F(t)=P(X>t)
+$$
+which is the probability to survive past time t.
+
+-  hazard function: 
+
+$$
+h(t)=\lim_{t \rightarrow \infty} \frac{P(t<T<t+h)}{h}
+$$
+which is the probability to survive until time t, and then die.
+
+-  cumulative hazard function: 
+
+$$
+H(t)=\int_0^{\infty} h(t) dt
+$$
+
+
+it is easy to check that
+
+-  $h(t)=f(t)/S(t)$  
+-  $H(t)=-\log S(t)$
+
+Here are some standard survival distributions and their associated functions:
+
+- **Exponential**  
+    *  $f(t)=\lambda \exp (-\lambda t)$  
+    *  $S(t) = \exp (-\lambda t)$  
+    *  $h(t) = \lambda$  
+    *  $H(t) = \lambda t$
+    
+    $\lambda$ is called rate parameter
+  
+-  **Weibull**  
+    *  $f(t)= \frac{\alpha}{\lambda}  (\frac{t}{\lambda})^{\alpha-1} \exp \left( -(\frac{t}{\lambda})^\alpha \right)$  
+    *  $S(t) = \exp\left( -(\frac{t}{\lambda})^\alpha \right)$  
+    *  $h(t) = \frac{\alpha}{\lambda} (\frac{t}{\lambda})^{\alpha-1}$  
+    *  $H(t) = (\frac{t}{\lambda})^\alpha$
+    
+    $\alpha$ is called the shape parameter and $\lambda$ the scale parameter 
+    
+-  **Log-Logistic**  
+    *  $f(t)=\frac{\lambda \tau (\lambda t)^{\tau-1}}{(1+(\lambda t)^\tau)^2}$  
+    *  $S(t) = \frac1{1+(\lambda t)^\tau}$  
+    *  $h(t) = \frac{\lambda \tau (\lambda t)^{\tau-1}}{1+(\lambda t)^\tau}$  
+    *  $H(t) =\log (1+ (\lambda t)^\tau)$    
+
+also often used are the log-normal and the gamma distributions.
+
+#### **Example**: Life table USA
+
+Let's see whether we can fit a  Weibull distribution to our data:
+
+```{r}
+y <- life.us.1$Alive[life.us.1$Gender=="Male"]
+x <- life.us.1$Age[life.us.1$Gender=="Male"]
+fit.male <- coef(nls(y~exp(-(x/l)^a), 
+                     start=list(l=100, a=4)))
+y <- life.us.1$Alive[life.us.1$Gender=="Female"]
+x <- life.us.1$Age[life.us.1$Gender=="Female"]
+fit.female <- coef(nls(y~exp(-(x/l)^a), 
+                       start=list(l=100, a=4)))
+x <- seq(0, 85, length=250)
+df.male <- data.frame(x=x, 
+          y=exp(-(x/fit.male[1])^fit.male[2]))
+df.female <- data.frame(x=x, 
+          y=exp(-(x/fit.female[1])^fit.female[2]))
+ggplot(data=life.us.1, aes(Age, Alive)) +
+    geom_point() +
+  geom_line(data=df.male, aes(x, y)) +
+  geom_line(data=df.female, aes(x, y))
+```
+
+and these fits are ok but not great.
+
+How about a gamma distribution?
+
+```{r}
+y <- life.us.1$Alive[life.us.1$Gender=="Male"]
+x <- life.us.1$Age[life.us.1$Gender=="Male"]
+fit.male <- coef(nls(y~(1-pgamma(x, a, b)), 
+                     start=list(a=10, b=0.1)))
+y <- life.us.1$Alive[life.us.1$Gender=="Female"]
+x <- life.us.1$Age[life.us.1$Gender=="Female"]
+fit.female <- coef(nls(y~(1-pgamma(x, a, b)), 
+                     start=list(a=10, b=0.1)))
+x <- seq(0, 85, length=250)
+df.male <- data.frame(x=x, 
+          y=1-pgamma(x, fit.male[1], fit.male[2]))
+df.female <- data.frame(x=x, 
+          y=1-pgamma(x, fit.female[1], fit.female[2]))
+ggplot(data=life.us.1, aes(Age, Alive)) +
+    geom_point() +
+  geom_line(data=df.male, aes(x, y)) +
+  geom_line(data=df.female, aes(x, y))
+```
+and that looks a bit worse.
+
+
+#### **Example**: Leukemia
+
+This is  survival times for leukemia, with covariates wbc, the white blood cell count and ag, a test result with values "present" or "absent".
+
+```{r}
+head(leukemia)
+```
+
+```{r}
+empdist <- function (data, npoints) 
+{
+    a <- hist(data, breaks = npoints, plot = F)
+    x <- a$mids
+    y <- cumsum(a$counts)/length(data)
+    list(x = x, y = y)
+}
+zp <- empdist(leukemia$time[leukemia$ag == "present"], 10)
+za <- empdist(leukemia$time[leukemia$ag == "absent"], 10)
+df <- data.frame(Time=c(za$x, zp$x),
+                 Survival=1-c(za$y, zp$y),
+                 Status=rep(c("Present", "Absent"), 
+                c(length(za$x), length(zp$x))))
+df
+ggplot(data=df, aes(Time, Survival, color=Status)) +
+    geom_line()
+```
+
+
+`r hl()$hr()`
+
+The most distinctive feature of survival analysis is **censoring**. Say we are testing a new treatment for late-stage stomach cancer. At the beginning of the study we select 100 cancer patients and begin treatment. After 1 year we wish to study the effectiveness of the new treatment. At that time 47 of the patients have died, and for them we know the number of days until death. For the other 53 patients we know that they have survived 365 days but we don't know how much longer they will live. How do we use all the available information?
+
+Censoring comes in a number of different forms:
+
+- right censoring: here "case i" leaves the trial at time C~i~, and we either know T~i~ if $T_i \le C_i$, or that $T_i > C_i$.
+
+-  we have random censoring if T~i~ and C~i~ are independent.
+
+-  type I censoring is when the censoring times are fixed in advance, for example by the end of the clinical trial.
+
+-  type II censoring is when the the experiment is terminated after a fixed number of failures. 
+
+ In R we code the data as a pair $(t_i, d_i)$ where t~i~ is the observed survival time and $d_i=0$ if the observation is censored, 1 if a "death" is observed.
+
+Survival data is often presented using a + for the censored observations, for example 35, 67+, 85+, 93, 101, etc.
+
+Let $t_1 < t_2 < .. < t_m$ be the m distinct survival times. Let $Y_i(s)$ be an indicator function, which is 1 if person i is still at risk (that is alive) at time s and 0 otherwise, that is $Y_i(s)=I_{(0,t_i)}(s)$.
+
+Then the number of patients at risk at time s is $r(s)=\sum Y_i(s)$. We can similarly define d(s) as the number of deaths occuring at time s. 
+
+There is also a modern approach to survival data based on stochastic processes, especially martingales and counting processes. In this setup one considers the counting process $N_i(t)$ associated with the ith subject, so $N_i(t)$ changes by 1 at each observed event ( for example, a vist to the doctor, a heart attack, a death etc). 
+
+How can we estimate the survivor curve in the presence of censoring? One of the most commonly used estimators is the **Kaplan-Meier** estimator:
+
+$$
+\hat{S}(x)= \prod_{t_i<t} \frac{r(t_i)-d(t_i)}{r(t_i)}
+$$
+In R this is calculated by the routine *survfit*. It uses as its argument a "survival" object which in turn is generated using the Surv function. 
+
+
+#### **Example**: Leukemia
+
+This data does not have censoring, bit let's see what Kaplan Meier looks like anyway:
+
+
+```{r}
+head(leukemia)
+library(survival)
+fit <- survfit(Surv(time) ~ ag, data = leukemia)
+plot(fit)
+```
+
+#### **Example**: Gehan data
+
+A data frame from a trial of 42 leukaemia patients. Some were treated with the drug _6-mercaptopurine_ and the rest are controls. The trial was designed as matched pairs, both withdrawn from the trial when either came out of remission.
+
+```{r}
+head(gehan)
+```
+
+```{r}
+fit <- survfit(Surv(time, cens) ~ treat, data = gehan)
+plot(fit, xlab = "Time", ylab = "Est. Remission", 
+     col = c("blue", "red"))
+legend(1, 0.2, c("Control", "6-MP"), 
+       col = c("red", "blue"), lty = c(1, 1))
+```
+
+The obvious question is whether there are differences between the remission times of the two groups: 
+
+```{r}
+survdiff(Surv(time, cens) ~ treat, data = gehan)
+```
+
+and we see that there is.
+
+Confidence intervals for the survival curve are automatically computed by the survfit function. By default it finds intervals of the form $S \pm 1.96se(S)$. Other options are:
+
+-  conf.type="log": $\exp(\log(S) \pm 1.96se(H))$  
+-  conf.type="log-log": $\exp (- \exp(\log(-\log(S) \pm 1.96se(\log(H)))$
+
+One advantage of log-log is that the limits are always in (0,1). 
+
+Let's find $90\%$ confidence intervals based on these three methods for t=10 in the 6-MP group.
+
+```{r}
+A <- matrix(0, 3, 2)
+dimnames(A) <- list(c("plain", "log", "log-log"), 
+                    c("Lower", "Upper"))
+fit <- survfit(Surv(time, cens) ~ treat, data = gehan, 
+            conf.type = "plain", conf.int = 0.9)
+A[1, 1] <- fit$lower[fit$time == "10"]
+A[1, 2] <- fit$upper[fit$time == "10"]
+fit <- survfit(Surv(time, cens) ~ treat, data = gehan, 
+            conf.type = "log", conf.int = 0.9)
+A[2, 1] <- fit$lower[fit$time == "10"]
+A[2, 2] <- fit$upper[fit$time == "10"]
+fit <- survfit(Surv(time, cens) ~ treat, data = gehan, 
+            conf.type = "log-log", conf.int = 0.9)
+A[3, 1] <- fit$lower[fit$time == "10"]
+A[3, 2] <- fit$upper[fit$time == "10"]
+round(A, 2)
+```
+
+An important question for new patients is of course the average survival time. As always "average" can be computed in different ways. R uses the median and the estimate is part of the output for a survfit object 
+
+```{r}
+survfit(Surv(time, cens) ~ treat, data = gehan)
+```
+
+Sometimes it is possible to fit a parametric curve via generalized linear models to the survival curve. Say we wish to fit an exponential model, and suppose we have a covariate vector x for each case. Say $\lambda_i$ is the rate of the exponential for case i. Then we can connect the rate to the covariates via the model $\lambda_i = \beta^T x$. This might on occasion be negative, and it is often better to use $\log(\lambda_i)=\beta^Tx$.
+
+#### **Example**: Leukemia
+
+ Let's see whether the Leukemia data can be modeled in this way. First we have a look at the relationship of time and its covariates: 
+ 
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(ggplot(data=leukemia, aes(time, wbc)) +
+        geom_point(),
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=leukemia, aes(ag, time)) + 
+        geom_boxplot(),
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+print(ggplot(data=leukemia, aes(log(time), log(wbc))) +
+               geom_point(),
+  vp=viewport(layout.pos.row=2, layout.pos.col=1))
+```
+
+The relationships do not appear to be linear, and we fix this by using a log transform on time and wbc.
+
+What model might be appropriate for this dataset? For the exponential model we have $-\log S(t)=H(t)=\lambda t$, so if we plot $-\log S(t)$ vs t we should see a linear relationship:
+
+```{r}
+fit <- survfit(Surv(time, rep(1, 33)) ~ ag, data = leukemia)
+df <- data.frame(Time=fit$time,
+             y=-log(fit$surv),
+             Status=rep(c("present", "absent"), c(12, 15)) )
+ggplot(data=df, aes(Time, y, color=Status)) +
+  geom_point() +
+  geom_smooth(method="lm", se=FALSE) +
+  labs(y= "-logS")
+```
+
+we fit this model via glm:
+
+```{r}
+options(contrasts = c("contr.treatment", "contr.poly"))
+fit <- glm(time ~ ag + log(wbc), family = Gamma(log),
+           data=leukemia)
+summary(fit, dispersion = 1)
+```
+
+## Cox Proportional Hazard Model
+
+A nonparametric approach to survival data was first introduced by Cox in 1972. Here we model the hazard function h as follows: there is a baseline hazard $h_0(t)$ which is modified by covariates, so the hazard function for any individual case is 
+$$
+h(t) = h_0(t)\exp(\beta^Tx)
+$$
+and the interest is mainly in $\beta$.
+
+The vector $\beta$ is estimated via partial likelihood.
+
+Suppose a death occurs at time t~j~. Then conditionally on this event the probability that case i died is
+
+$$
+\frac{h_0(t)\exp (\beta^Tx_i)}{\sum_j I{[T_j\ge t]}h_0(t)\exp (\beta^Tx_i)}=\frac{\exp (\beta^Tx_i)}{\sum_j I{[T_j\ge t]}\exp (\beta^Tx_i)}
+$$
+which does not depend on the baseline hazard. 
+
+#### **Example**: Leukemia
+
+```{r}
+fit <- coxph(Surv(time) ~ ag + log(wbc), data=leukemia)
+summary(fit)
+```
+
+#### **Example**: Lung Cancer
+
+Survival in patients with lung cancer at Mayo Clinic. Performance scores rate how well the patient can perform usual daily activities.
+
+Variables:  
+inst: Institution code 
+time: Survival time in days 
+status: censoring status 1=censored, 2=dead  
+age: Age in years  
+sex: Male=1 Female=2  
+ph.ecog: ECOG performance score (0=good 5=dead) 
+ph.karno: Karnofsky performance score (bad=0-good=100) rated by physician  
+pat.karno: Karnofsky performance score rated by patient  
+meal.cal: Calories consumed at meals  
+wt.loss: Weight loss in last six months
+
+Source: Terry Therneau
+
+```{r}
+head(lung.cancer)
+```
+
+```{r}
+library(GGally)
+ggpairs(lung.cancer)
+
+```
+
+ Next we want to fit the Cox proportional hazards model, but there are two issues we need to deal with:
+
+-  what to do with the missing values? we remove them from the dataset using na.action=na.omit
+
+-  in this experiment sex was a stratification variable. We can include this fact in our model by using strata(sex) instead of just sex. This allows for nonproportional hazards.
+
+```{r}
+fit <- coxph(Surv(time, status) ~ strata(sex) + age + 
+       ph.ecog + ph.karno + pat.karno + meal.cal + wt.loss, 
+                 na.action = na.omit,
+          data=lung.cancer)
+summary(fit)
+```
+ 
+ Notice the three hypothesis tests at the bottom. They do the job of the F-test in regression, namely testing whether all the variables together are useful for predicting time. Hear clearly they are.
+
+Checking the individual covariates we see that age and meal.cal are not significant. Let's remove them
+
+```{r}
+fit <- coxph(Surv(time, status) ~ strata(sex) + ph.ecog + 
+            ph.karno + pat.karno + wt.loss, 
+            na.action = na.omit, data=lung.cancer)
+summary(fit)
+```
+
+Next we want to try and assess whether this model is appropriate. In regression we use the residual vs. fits plot for this purpose. Here we have something similar. There are actually several kinds of residuals in a survival analysis, we will use what are called the martingale residuals. The plots are the residuals with the variable of interest vs. the residuals without the variable of interest. Again we need to deal with the missing values, and we remove them from the dataset. Finally we add a loess curve to the graphs. All of this is done in 
+
+```{r}
+lung1 <- na.omit(lung.cancer[, -c(1, 4, 9)])
+fit <- coxph(Surv(time, status) ~ strata(sex) + ph.karno + 
+            pat.karno + wt.loss, data=lung1)
+df <- data.frame(ph.ecog=lung1$ph.ecog,
+                 pat.karno=lung1$pat.karno,
+                 ph.karno=lung1$ph.karno,
+                 wt.loss=lung1$wt.loss,
+                 Residuals=resid(fit))
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(ggplot(data=df, aes(ph.ecog, Residuals)) +
+        geom_point() + geom_smooth(se=FALSE),
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=df, aes(ph.karno, Residuals)) +
+        geom_point() + geom_smooth(se=FALSE),
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+print(ggplot(data=df, aes(pat.karno, Residuals)) +
+        geom_point() + geom_smooth(se=FALSE),
+  vp=viewport(layout.pos.row=2, layout.pos.col=1))
+print(ggplot(data=df, aes(wt.loss, Residuals)) +
+        geom_point() + geom_smooth(se=FALSE),
+  vp=viewport(layout.pos.row=2, layout.pos.col=2))        
+```
+All of the relationships look reasonably linear.
+
+Finally we can have a look whether the assumption of proportional hazards is justified. For this we use the cox.zph function. This plots the rescaled Shoenfeld residuals. A flat appearance indicates that the assumption is ok. The corresponding object carries out hypothesis tests for a significant slope in the scatterplots, which support our assessment. 
+
+```{r}
+fit.zph <- cox.zph(fit)
+plot(fit.zph)
+print(fit.zph)
+```
+

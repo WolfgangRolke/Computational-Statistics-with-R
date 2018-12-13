@@ -1,0 +1,397 @@
+---
+title: Model Checking
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+Most discussions in Statistics start with a sentence like this:
+
+*we have observations $x_1, .., x_n$ from a normal distribution... *
+
+and so everyhing that follows depends on the assumption. But how do we know that a data set comes from a certain distribution in real life?
+
+## Graphical Checks
+
+The most common checks we do are graphical. 
+
+### Histogram with Fit
+
+we draw a histogram of the data, scaled to have total area 1, and overlay it with the theoretical curve:
+
+```{r}
+x <- rbeta(1000, 2, 5)
+```
+
+```{r}
+bw <- diff(range(x))/50 
+ggplot(data.frame(x=x), aes(x)) +
+ geom_histogram(aes(y = ..density..),
+    color = "black", 
+    fill = "white", 
+    binwidth = bw) + 
+    labs(x = "x", y = "Density") +
+  stat_function(fun = dbeta, colour = "blue", 
+          args=list(shape1=2, shape2=5))
+```    
+
+this works fine if we have sufficient data to do a histogram. If not we have
+
+### Probability Plot
+
+```{r}
+x <- rnorm(50)
+ggplot(data=data.frame(x=x), aes(sample=x)) +
+           geom_qq() + geom_qq_line()       
+```
+
+What is drawn here? As the axis say, it is *sample* vs *theoretical*. Specifically it is the *quantiles* of the data set vs the quantiles of the distribution we are checking for:
+
+```{r}
+df <- data.frame(x=qnorm(1:50/51), y=sort(x))
+ggplot(data=df, aes(x, y)) +
+  geom_point() 
+```
+
+and the line is drawn through the *quartiles*. It can be shown that if the data indeed comes from this distribution the points should fall along a straight line.
+
+Note that this graph is  *scale invariant*:
+
+```{r}
+x <- rnorm(50, 100, 30)
+df <- data.frame(x=qnorm(1:50/51), y=sort(x))
+ggplot(data=df, aes(x, y)) +
+  geom_point() 
+```
+
+It works for other distributions as well:
+
+```{r}
+x <- rexp(50, 1)
+df <- data.frame(x=qexp(1:50/51), y=sort(x))
+ggplot(data=df, aes(x, y)) +
+  geom_point() 
+```
+
+here are some examples where the distribution is not normal:
+
+```{r}
+df <- data.frame(x1=runif(100),
+                 x2=rt(100, 2),
+                 x3=rbeta(1000, 2, 3),
+                 x4=rchisq(100, 2))
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(ggplot(data=df, aes(sample=x1)) +
+           geom_qq() + geom_qq_line() ,
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=df, aes(sample=x2)) +
+           geom_qq() + geom_qq_line() ,
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+print(ggplot(data=df, aes(sample=x3)) +
+           geom_qq() + geom_qq_line() ,
+    vp=viewport(layout.pos.row=2, layout.pos.col=1))
+print(ggplot(data=df, aes(sample=x4)) +
+           geom_qq() + geom_qq_line() ,
+    vp=viewport(layout.pos.row=2, layout.pos.col=2))        
+```
+
+with some experience it is possible to tell from the shape of the graph in which way the true distribution differs from the normal (maybe it has longer tails, is skewed etc.)
+
+## Formal Tests
+
+There are a number of hypothesis tests one can use as well. The most important is the
+
+### Chisquare Goodness of Fit Test
+
+#### **Example**: Experiments in Plant Hybridization (1865)
+
+by Gregor Mendel is one of the most famous papers in all of Science. His theory of genetics predicted that the number of Smooth yellow, wrinkled yellow, smooth green and wrinkled green peas would be in the proportions 9:3:3:1. In one of his experiments he observed 315, 101, 108 and 32. Does this agree with his theory?
+
+How does this fit into our current discussion? Essentially his theory said that peas appear according to a *multinomial distribution*  with parameters $m=4, p=(9/16, 3/16, 3/16, 1/16)$.
+
+One can show that the likelihood ratio test (together with some approximations) leads to the famous **chisquare statistic**
+
+$$
+\chi^2=\sum \frac{(O-E)^2}{E}
+$$
+
+where $O$ are the observed counts and $E$ are the expected counts. Under the null hypothesis $\chi^2$ has a chisquare distribution with m-1 degrees of freedom.
+
+For Mendels data we find
+
+```{r}
+O <- c(315, 101, 108, 32)
+p <- c(9/16, 3/16, 3/16, 1/16)
+E <- sum(O)*p
+chi <- sum((O-E)^2/E)
+c(chi, 1-pchisq(chi, 3))
+```
+
+and so we fail to reject the null hypothsis, Mendels theory works.
+
+This is a *large-sample* test (because of the approximations). The general requirement is that $E>5$.
+
+`r hl()$hr()`
+
+The chisquare statistic was already known in the mid 19th centrury but its distribution was derived by Karl Pearson in 1900. His argument was as follows: O is the sum of indicator random variables ($X_i$ is of type i or not), so O has a binomial distribution, and if n is large enough $(O-E)/\sqrt{E} \sim N(0,1)$. Therefore $(O-E)^2/E \sim \chi^2(1)$. Finally $\sum (O-E)^2/E \sim \chi^2(m-1)$ because there is one "restriction", namely $\sum O=n$.
+
+#### **Example**: Death by kicks from a Horse
+
+Number of deaths by horsekicks in the Prussian army from 1875-1894 for 14 Corps.
+
+```{r}
+horsekicks
+```
+
+Some theoretical arguments make it a reasonable guess that this data should follow a Poisson distribution, that is 
+
+$$
+P(X=k)=\frac{\lambda^k}{k!} e^{-\lambda}
+$$
+we want to test this. That is we have
+
+$$
+H_0: X \sim \text{Poisson}
+$$
+
+Notice though that this does not say what $\lambda$ is.
+
+The idea is the following: if the Poisson model works at all, it should work for the value of $\lambda$ that minimizes the chisquare statistic. So if we denote this number by $\hat{\lambda}$, we should test 
+
+$$
+H_0: X \sim \text{Poisson}(\hat{\lambda})
+$$
+
+However, this estimation will cost us a degree of freedom, so the distribution of the statistic is now chisquare with m-1-k degrees of freedom, where k is the number of parameters estimated.
+
+Note that this requires an unusual estimation technic, called *minimum chisquare*. In practice people just use *maximum likelihood*, but this is not always going to work.
+
+We have another issue: in some years there were very few deaths, so the $E$ would be small, less than 5. We can deal with this by grouping the data:
+
+```{r}
+df <- data.frame(Period=c("0-6", "7-9", "10-12", "Over 12"),
+                 Counts=c(6, 4, 5, 5))
+kableExtra::kable(df)
+```
+
+
+```{r}
+chi.fun <- function(lambda) {
+  p <- c(ppois(6, lambda), sum(dpois(7:9, lambda)),
+         sum(dpois(10:12, lambda)), 1-ppois(12, lambda))
+  E <- 20*p
+  sum((df$Counts-E)^2/E)
+}
+lambda <- seq(8, 11, length=100)
+y <- lambda
+for(i in 1:100) y[i] <- chi.fun(lambda[i])
+df1 <- data.frame(lambda=lambda,
+                 chi=y)
+ggplot(data=df1, aes(lambda, chi)) +
+  geom_line()
+lambda[y==min(y)]
+```
+
+Notice that in this case the minimum chisquare estimate is quite different from the mle, which is
+
+```{r}
+mean(horsekicks[, 2])
+```
+
+now
+
+```{r}
+tmp <- chi.fun(9.36)
+c(tmp, 1-pchisq(tmp, 2))
+```
+
+and so we find weak evidence for the Poisson distribution.
+
+Notice that the binning we did of the data was completely arbitrary. 
+
+Notice that this test differs from those we discussed previously: it does not have an alternative hypothesis. Of course we could just have used
+
+$$
+H_a: X \not\sim \text{Poisson}
+$$
+
+but that seems rather pointless. In fact, this is part of a larger discussion, the difference between *Fisherian* and *Neyman-Pearson* hypothesis testing which would however lead us to far away. 
+
+`r hl()$hr()`
+
+The adjustment of the degrees of freedom for the number of estimated parameters has an interesting history. It does not appear in Pearson's original derivation. In fact, following Pearson's logic there should be no need for this adjustement, because if the sample size is large enough any parameter should be estimated with sufficiently high precision. The need for the adjustment was recognized only 20 years after the original publication of Pearson by none other than Egon Pearson (Karl's son) and by Sir Ronald Fisher and is now sometimes called the Fisher-Pearson statistic.
+
+` r hl()$hr()`
+
+In the case of continuous distributions this becomes even more complicated because now there are infinitely many ways to bin the data. The are two main strategies:
+
+-  equal size  
+-  equal probability
+
+in general the second one is recommended.
+
+#### **Example**: Euro coins
+
+Do the weights follow a normal distribution? 
+
+Let's test this with k=10 (??) equal probability bins.
+
+Again we need to estimate the parameters. Because this is a large sample we will use the mle's:
+
+```{r}
+round(c(mean(euros$Weight), sd(euros$Weight)), 4)
+```
+
+```{r}
+bins <- c(7, quantile(euros$Weight, 1:9/10), 8)
+pb <- sprintf("%.3f", bins)
+O <- hist(euros$Weight, breaks = bins, plot=FALSE)$counts
+E <- round(2000*diff(pnorm(bins, 7.5212, 0.0344)), 1)
+df <- cbind(Bins=paste0(pb[-11],"-",pb[-1]), 
+            O, E=sprintf("%.1f", E))
+rownames(df) <- NULL
+kable(df)
+chi <- sum((O-E)^2/E)
+c(round(chi, 2), round(1-pchisq(chi, 10-1-2), 3))
+```
+
+and so we reject the null hypothesis at the $5\%$ level, this data does not come from a normal distribution.
+
+It should be clear that there are many issues here:
+
+-  how to estimate the parameters  
+-  how to bin  
+-  how many bins
+
+and all of these can lead to different results.
+
+## Tests based on the empirical distribution function
+
+Recall the definition of the *empirical distribution function*:
+
+$$
+\hat{F}(x)=\frac{1}{n} \sum I_{(-\infty, x)} (x_i)
+$$
+
+#### **Example**: Artificial example
+
+```{r}
+set.seed(112)
+df <- data.frame(x=rnorm(10))
+x=seq(-3, 3, length=250)
+df1 <- data.frame(x=x,  y=pnorm(x))
+ggplot(df, aes(x)) + 
+  stat_ecdf(geom = "step") +
+  geom_line(data=df1, aes(x, y))
+```
+
+There are a number of tests based on some measure of "distance" between these two curves.
+
+### Kolmogorov-Smirnov
+
+$$
+D=\max \left\{ |F(x)-\hat{F}(x)|; x \in R \right\}
+$$
+this is implemented in *ks.test* 
+
+```{r}
+ks.test(euros$Weight, "pnorm", mean=7.521, sd=0.0344)
+```
+
+notice however that this requires specific values of the parameters.
+
+In the case of the normal distribution Lilliefors derived a test based on this statistic that allows estimation of the parameters:
+
+```{r}
+library(nortest)
+lillie.test(euros$Weight)
+```
+
+and we see that this test correctly rejects the null.
+
+An often better alternative to Kolmogorov-Smirnov is the
+
+### Anderson-Darling test
+
+it uses 
+
+$$
+D=n\int_{-\infty}^{\infty} \frac{(F(x)-\hat{F}(x))^2}{F(x)(1-F(x))} dx
+$$
+essentially this gives greater weight to the tail of the distribution, where F(x) and 1-F(x) are small.
+
+The *ad.test* in R tests for composite normality:
+
+```{r}
+ad.test(euros$Weight)
+```
+
+## Null distribution via simulation
+
+Let's say we wish to test whether a data set comes from an exponential distribution, and we want to use the Kolmogorov-Smirnov statistic. Now we need to estimate the rate, and so the basic test won't work. We can however do this:
+
+-  generate data from an exponential with the rate equal to the mle of the data. 
+-  find the KS statistic  
+-  repeat many time  
+-  compare the results to the KS from the data
+
+```{r cache=TRUE}
+x1 <- rexp(20, 1)
+x2 <- rgamma(20, 2, 1)
+rt1 <- 1/mean(x1)
+rt2 <- 1/mean(x2)
+B <- 1000
+ks.sim <- matrix(0, B, 2)
+for(i in 1:B) {
+  ks.sim[i, 1] <- ks.test(rexp(20, rt1), 
+                          "pexp", rate=rt1)$statistic
+    ks.sim[i, 2] <- ks.test(rexp(20, rt2), 
+                          "pexp", rate=rt2)$statistic
+}
+ks.dat <- c(ks.test(x1, "pexp", rate=rt1)$statistic,
+            ks.test(x2, "pexp", rate=rt2)$statistic)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+bw1 <- diff(range(ks.sim[, 1]))/50
+bw2 <- diff(range(ks.sim[, 2]))/50
+print(ggplot(data.frame(x=ks.sim[, 1]), aes(x)) +
+  geom_histogram(color = "black", 
+                 fill = "white", 
+                 binwidth = bw1) + 
+  labs(x = "x", y = "") +
+    geom_vline(xintercept=ks.dat[1], color="blue"),
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data.frame(x=ks.sim[, 1]), aes(x)) +
+  geom_histogram(color = "black", 
+                 fill = "white", 
+                 binwidth = bw2) + 
+  labs(x = "x", y = "") +
+    geom_vline(xintercept = ks.dat[2], color="blue"),
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))  
+```
+
+```{r}
+sum(ks.sim[, 1]>ks.dat[1])/B
+sum(ks.sim[, 2]>ks.dat[2])/B
+```
+
+and this test does not rely on any probability theory.

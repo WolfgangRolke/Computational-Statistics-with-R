@@ -1,0 +1,566 @@
+---
+title: Multiple Linear Regression
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+library(wolfr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+#### **Example**: House Prices
+
+Prices of residencies located 30 miles south of a large metropolitan area with several possible predictor variables.
+
+
+```{r echo=FALSE}
+attach(houseprice)
+```
+Notice the 1.7 baths!
+
+```{r}
+houseprice
+```
+
+Let's go through the list of predictors one by one:
+
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+pos <- expand.grid(1:2, 1:2)
+for(i in 1:4) {
+  plt <- 
+    ggplot(data=houseprice, 
+           aes_(x = as.name(names(houseprice)[i+1]), 
+                y = as.name(names(houseprice)[1]))) +
+    geom_point() +
+    geom_smooth(method = "lm", se=FALSE) 
+  print(plt, 
+  vp=viewport(layout.pos.row=pos[i, 1], 
+              layout.pos.col=pos[i, 2]))
+  cat("Price and ", colnames(houseprice)[i+1], 
+      " ", round(cor(houseprice$Price, houseprice[, i+1]), 3), "\n")
+}
+```
+
+
+```{r}
+fit <- lm(Price~., data=houseprice)
+summary(fit)
+```
+
+For the assumptions there is nothing new, as before we need to check the residual vs. fits plot and the normal plot of residuals:
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+print(ggplot(data=df, aes(sample=Residuals)) +
+           geom_qq() + geom_qq_line(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0),
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+```
+
+This appears to be a good model and the assumptions of normally distributed residuals with equal variance appears to be o.k.
+ 
+Except,
+
+**Notice** that there is something very strange about this model!
+ 
+Let's have a look at the correlations between the predictors: 
+ 
+```{r}
+round(cor(houseprice[, -1]), 3)
+```
+
+The highest correlation between predictors is r=0.743 (Floors-Baths)
+
+As in the case of polynomial regression, highly correlated predictors are a potential problem. We will look at a solution called *principle components* at some point. Here we are ok.
+
+## Best Subset Regression  
+
+We have previously talked about the fact that we want our models to be as simple as possible. Often that means a model with as few predictors as possible. So the question becomes:
+
+**Can we eliminate any of our predictors without making the model (stat. signif.) worse?**
+
+There are several things one can think of:
+
+**Choose based on R^2^**
+
+but we already know this will always lead to the model with all predictors, for the same reason that a cubic model always has an R^2^ at least as high as the quadratic model. 
+
+Note:  
+
+Price by Sqfeet, Floors and Bedrooms: R^2^=80.1%  
+Price by Floors, Bedrooms and Baths: R^2^=68.4%  
+Price by Sqfeet, Bedrooms and Baths: R^2^=83.5%  
+Price by Sqfeet, Floors, Bedrooms and Baths: R^2^=88.2%  
+so model with all 4 has a higher R^2^ than any of the models with just 3, **but this will always be so, even if one of the predictors is completely useless**.
+
+**Choose based on Hypothesis Tests**
+
+in the summary(fit) above we see that p_value of Bedrooms = 0.187121 > 0.05, so eliminate Bedrooms.
+
+This sounds like a good idea AND IT IS WIDELY USED IN REAL LIFE, but it turns out to be a `r hl()$fontcolor("bad one")` ! The reason why is bit hard to explain, though.
+
+**Use nested models test**
+
+```{r}
+fit.without.bedrooms <- lm(Price~.-Bedrooms,
+                           data=houseprice)
+anova(fit, fit.without.bedrooms)
+```
+
+Again, this sounds like a good idea AND AGAIN IT IS WIDELY USED IN REAL LIFE, but it turns out to be a `r hl()$fontcolor("dangerous one")`! To start, if we have several predictors we might want to eliminate, we immediately face the issue of *simultaneous inference*. 
+
+There are several methods in wide use that are essentially based on this idea, such as *forward selection*, *backward selection* and *stepwise regression*. These are sometimes unavoidable but need to be done with great care!
+
+`r hl()$hr()`
+
+What we need is new idea:
+
+**Best Subset Regression and Mallow's C~p~**
+
+We will find ALL possible models and calculate Mallow's C~p~ statistic for each. The model with the lowest C~p~ is best. 
+
+```{r}
+library(leaps)
+out <- leaps(houseprice[, -1], houseprice$Price, 
+      method = "Cp", nbest=1)
+out
+colnames(houseprice)[2:5][out$which[seq_along(out$Cp)[out$Cp==min(out$Cp)], ]]
+```
+
+so the best model uses Sqfeet, Floors and Baths.
+
+To find the model we rerun lm, now without Bedrooms:
+
+```{r,warning=FALSE}
+summary(fit)
+```
+
+Note that the model with all four predictors has C~p~=5.0. But C~p~ is a **statistic**, its exact value depends on the sample. So is the model with Sqfeet, Floors and Baths **statistically significantly** better than the model with all four predictors? We would need a hypothesis test to answer this question but this is not part of our course. 
+
+### Prediction
+
+Prediction works just as it did for simple regression.  Say we want to find a 90% interval estimate for a house that has 2000 sqfeet, one floor and two baths. Then
+
+```{r}
+predict(fit.without.bedrooms, 
+        newdata=data.frame(Sqfeet=2000, 
+                           Floors=1, 
+                           Bedrooms=0,
+                           Baths=2), 
+        interval="prediction", level=0.9)
+```
+
+#### **Example**: Air Pollution and Mortality
+
+The dependent variable for analysis is age adjusted mortality (called "Mortality"). The data include variables measuring demographic characteristics of the cities, variables measuring climate characteristics, and variables recording the pollution potential of three different air pollutants.
+
+```{r echo=FALSE}
+attach(airpollution)
+```
+
+
+```{r}
+head(airpollution)
+```
+
+next we want to look at the scatterplots and the correlations. There are 15 predictors, so there are 15 graphs and correlations. 
+
+```{r}
+pos <- expand.grid(1:2, 1:2)
+pushViewport(viewport(layout = grid.layout(2, 2)))
+for(i in 1:4) {
+   plt <- 
+       ggplot(data=airpollution, 
+           aes_(x = as.name(names(airpollution)[i+1]), 
+                y = as.name(names(airpollution)[1]))) +
+    geom_point() +
+    geom_smooth(method = "lm", se=FALSE) 
+    print(plt, 
+    vp=viewport(layout.pos.row=pos[i, 1], 
+              layout.pos.col=pos[i, 2]))
+    cat("Mortality and ", colnames(airpollution)[i+1], 
+      " ", round(cor(airpollution$Mortality, 
+                     airpollution[, i]), 3), "\n")
+}  
+```
+
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+for(i in 5:8) {
+   plt <- 
+       ggplot(data=airpollution, 
+           aes_(x = as.name(names(airpollution)[i+1]), 
+                y = as.name(names(airpollution)[1]))) +
+    geom_point() +
+    geom_smooth(method = "lm", se=FALSE) 
+    print(plt, 
+    vp=viewport(layout.pos.row=pos[i-4, 1], 
+              layout.pos.col=pos[i-4, 2]))
+    cat("Mortality and ", colnames(airpollution)[i+1], 
+      " ", round(cor(airpollution$Mortality, 
+                     airpollution[, i]), 3), "\n")
+}  
+```
+
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+for(i in 9:11) {
+   plt <- 
+      ggplot(data=airpollution, 
+           aes_(x = as.name(names(airpollution)[i+1]), 
+                y = as.name(names(airpollution)[1]))) +
+    geom_point() +
+    geom_smooth(method = "lm", se=FALSE) 
+    print(plt, 
+    vp=viewport(layout.pos.row=pos[i-8, 1], 
+              layout.pos.col=pos[i-8, 2]))
+    cat("Mortality and ", colnames(airpollution)[i+1], 
+      " ", round(cor(airpollution$Mortality, 
+                     airpollution[, i]), 3), "\n")
+}  
+```
+
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+for(i in 12:15) {
+   plt <- 
+      ggplot(data=airpollution, 
+           aes_(x = as.name(names(airpollution)[i+1]), 
+                y = as.name(names(airpollution)[1]))) +
+    geom_point() +
+    geom_smooth(method = "lm", se=FALSE) 
+    print(plt, 
+    vp=viewport(layout.pos.row=pos[i-11, 1], 
+              layout.pos.col=pos[i-11, 2]))
+    cat("Mortality and ", colnames(airpollution)[i+1], 
+      " ", round(cor(airpollution$Mortality, 
+                     airpollution[, i]), 3), "\n")
+}  
+```
+
+There are problems with four predictors (Pop, HCPot, NOx, and NOxPot), Let's try the log transform and check again for those predictors:
+
+The easiest way to do this is to make a new matrix:
+
+```{r}
+newair <- airpollution
+newair[ ,c("Pop", "HCPot", "NOx", "NOxPot")] <- 
+  log(newair[, c("Pop", "HCPot", "NOx", "NOxPot")])
+colnames(newair)[c(10, 13, 14, 16)] <- c("log(Pop)", "log(HCPot)", "log(NOx)", "log(NOxPot)")
+pushViewport(viewport(layout = grid.layout(2, 2)))
+k <- 0
+for(i in c(10, 13, 14, 16)) {
+    k <- k+1
+    plt <- 
+      ggplot(data=newair, 
+           aes_(x = as.name(names(newair)[i]), 
+                y = as.name(names(newair)[1]))) +
+    geom_point() +
+    geom_smooth(method = "lm", se=FALSE) 
+    print(plt, 
+    vp=viewport(layout.pos.row=pos[k, 1], 
+              layout.pos.col=pos[k, 2]))
+    cat("Mortality and ", colnames(newair)[i], 
+      " ", round(cor(newair$Mortality, 
+                     newair[, i]), 3), "\n")
+} 
+```
+
+so in all cases the log transform worked, and we will use newair from now on.
+
+Let's find the correlations in absolute value of the predictors with the response, in order:
+
+```{r}
+cors <- round(cor(newair), 2)
+sort(abs(cors[ ,"Mortality"]), decreasing = TRUE)[-1]
+```
+
+Next we look at the correlations between the predictors. 
+
+```{r}
+cors[-1, -1]
+```
+We find:
+  
+a) there are sizable correlations (for example cor(NonWhite,JulyTemp)=0.60).
+
+Because of this unterpreting (understanding) the final model will be difficult.
+
+b) LOGT(NOxPot) and LOGT(NOx) are perfectly correlated.
+
+Using perfectly correlated predictors is not possible so we eliminate one of them, say log(NOx):
+
+```{r}
+newair <- newair[, -16]
+```
+ 
+Next we fit a model with all the predictors and check the assumptions:
+
+```{r, warning=FALSE}
+fit <- lm(Mortality~., data=newair)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+print(ggplot(data=df, aes(sample=Residuals)) +
+           geom_qq() + geom_qq_line(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0),
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+```
+
+The residual vs fits plot looks fine, so there is no problem with the model.
+
+The normal plot is ok, so no problem with the normal assumption.
+The residual vs fits plot looks fine, so there is no problem with the equal variance assumption.
+
+Next we use the best subset regression to see whether we can find a model with fewer predictors. 
+
+```{r}
+out <- leaps(newair[, -1], newair$Mortality, 
+      method = "Cp", nbest=1)
+colnames(newair)[-1][out$which[seq_along(out$Cp)[out$Cp==min(out$Cp)], ]]
+```
+
+It suggests a model based on JanTemp, Rain, PopDensity, NonWhite, WhiteCollar and LOGT(NOx) with Mallow's C~p~=4.32
+
+```{r, warning=FALSE}
+df <-  newair[, c("Mortality", 
+                  "JanTemp", 
+                  "Rain", 
+                  "PopDensity", 
+                  "NonWhite",
+                  "WhiteCollar", 
+                  "log(NOx)")]
+fit <- lm(Mortality~., data=df)
+summary(fit)
+```
+
+Because the best model does still include one of the pollution variables, we can conclude that pollution adds to the mortality rate.
+
+And we are done!
+
+#### **Example**: US Temperatures
+
+The data gives the normal average January minimum temperature in degrees Fahrenheit with the latitude and longitude of 56 U.S. cities. (For each year from 1931 to 1960, the daily minimum temperatures in January were added together and divided by 31. Then, the averages for each year were averaged over the 30 years.)
+
+Variables:  
+City: City  
+State: State postal abbreviation  
+JanTemp: Average January minimum temperature in degrees F.  
+Latitude: Latitude in degrees north of the equator  
+Longitude: Longitude in degrees west of the prime meridian 
+
+```{r}
+head(ustemperature)
+```
+
+we want to develop a model that predicts the temperature from the longitude and latitude.
+
+Let's begin by considering the predictors:
+
+```{r}
+ggplot(data=ustemperature, aes(Longitude, Latitude)) +
+  geom_point() 
+```
+
+this however looks wrong, it is switched left to right. That is because every Longitude comes withe Esat and West, and all of the US is in West. So we need to
+
+```{r}
+ustemperature$Longitude <- -ustemperature$Longitude
+```
+
+we can do even better than just the scatterplot:
+
+```{r}
+library(maps)
+usa <- map_data("usa") 
+ggplot() + 
+  geom_polygon(data = usa, 
+              aes(x=long, y = lat, group = group),
+              alpha=0.1) + 
+  coord_fixed(1.3) +
+  geom_point(data=ustemperature,
+             aes(Longitude, Latitude)) +
+  labs(x="Longitude", y="Latitude") +
+  scale_x_continuous(breaks = c(-120, -100, -80), 
+                     labels = c("120W", "100W", "80W"))
+```
+
+Now the relationship of Latitude to Temperature
+
+```{r}
+ggplot(data=ustemperature, aes(Latitude, JanTemp)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE)
+```
+
+seems fairly linear.
+
+```{r}
+ggplot(data=ustemperature, aes(Longitude, JanTemp)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE)
+```
+
+this does not. Let's fit a polynomial model in Longitude:
+
+```{r}
+fit.quad <- lm(JanTemp~poly(Longitude, 2), 
+               data=ustemperature)
+```
+
+```{r}
+df <- data.frame(Residuals=resid(fit.quad), 
+            Fits = fitted(fit.quad))
+ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0)        
+```
+
+not so good yet, so
+
+```{r}
+fit.cube <- lm(JanTemp~poly(Longitude, 3), 
+               data=ustemperature)
+df <- data.frame(Residuals=resid(fit.cube), 
+            Fits = fitted(fit.cube))
+ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0)        
+```
+
+and that is fine.
+
+Now we put it together:
+
+```{r}
+fit <- lm(JanTemp~Latitude + poly(Longitude, 3), 
+               data=ustemperature)
+summary(fit)
+```
+
+```{r}
+pushViewport(viewport(layout = grid.layout(1, 2)))
+df <- data.frame(Residuals=resid(fit), 
+            Fits = fitted(fit))
+print(ggplot(data=df, aes(sample=Residuals)) +
+           geom_qq() + geom_qq_line(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0),
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+```
+
+shows that this indeed a good model.
+
+How can we visualize this model? Let's do the following:
+
+-  find a fine grid of points in the US  
+-  for each such point use the model to predict the temperature -  draw the map with these predictions
+
+```{r cache=TRUE}
+x <- seq(-130, -70, length=50)
+y <- seq(25, 50, length=50)
+xy <- expand.grid(x, y)
+df <- data.frame(Longitude=xy[, 1],
+                  Latitude=xy[, 2])
+df$Temp <- predict(fit, df)
+```
+
+```{r}
+ggplot() + 
+  geom_polygon(data = usa, 
+              aes(x=long, y = lat, group = group),
+              alpha=0.1) + 
+  coord_fixed(1.3) +
+  geom_point(data=df, aes(Longitude, Latitude, color=Temp)) +
+  scale_colour_gradient(low="blue", high="red") +
+  labs(x="Longitude", y="Latitude", color="Temperature") +
+  scale_x_continuous(breaks = c(-120, -100, -80), 
+                     labels = c("120W", "100W", "80W"))
+```
+
+It would be nicer, though, if we had points only in the US. We can use the data set us.cities in the map library to get coordinates:
+
+```{r}
+df <- us.cities[, 5:4]
+df <- df[df[, 2]<50, ] #not Alaska
+df <- df[df[, 2]>25, ] #not Hawaii
+colnames(df) <- c("Longitude", "Latitude")
+df$Temp <- predict(fit, df)
+```
+
+```{r}
+ggplot() + 
+  geom_polygon(data = usa, 
+              aes(x=long, y = lat, group = group),
+              alpha=0.1) + 
+  coord_fixed(1.3) +
+  geom_point(data=df, aes(Longitude, Latitude, color=Temp)) +
+  scale_colour_gradient(low="blue", high="red") +
+  labs(x="Longitude", y="Latitude", color="Temperature") +
+  scale_x_continuous(breaks = c(-120, -100, -80), 
+                     labels = c("120W", "100W", "80W"))
+```
+
+How about Puerto Rico?
+
+```{r}
+df <- data.frame(Longitude=-65.1, Latitude=18.1)
+predict(fit, df)
+```
+
+Clearly this is an extrapolation!
+
+Here is another way to understand this model: image we take a trip from New York (Long=73.94, Lat=40.67) to San Francisco (Long-122.45, Lat=37.77). How does our model say the temperature changes?
+
+```{r}
+df <- data.frame(Longitude=seq(-122, -70, length=250),
+                 Latitude=rep(40, 250))
+df$Temp <- predict(fit, df)
+ggplot(df, aes(Longitude, Temp)) +
+  geom_line()
+```
+
+How about a nonparametric fit?
+
+```{r}
+fit.loess <- loess(JanTemp~Longitude+Latitude,
+                   data=ustemperature)
+df$Temp <- predict(fit.loess, df)
+ggplot(df, aes(Longitude, Temp)) +
+  geom_line()
+```
+
+which looks fairly similar.

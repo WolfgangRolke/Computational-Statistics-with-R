@@ -1,0 +1,310 @@
+---
+title: Time Series Analysis
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+A *time series* is any data collected over a period of time. Examples are
+
+-  Dow Jones Industrial index  
+-  Population of Earth  
+-  Number of AIDS patients at some hospital 
+-  ...
+
+The main feature that sets time series apart is that the assumption of independence usually fails. If I wanted to guess the size of the human population in 2019, knowing  what it is in 2018 might be useful.
+
+#### **Example**: Births in New York
+
+data set of the number of births per month in New York city, from January 1946 to December 1959 (originally collected by Newton)
+
+```{r echo=FALSE}
+births <-
+c(26.663, 23.598, 26.931, 24.74, 25.806, 24.364, 24.477, 23.901, 
+23.175, 23.227, 21.672, 21.87, 21.439, 21.089, 23.709, 21.669, 
+21.752, 20.761, 23.479, 23.824, 23.105, 23.11, 21.759, 22.073, 
+21.937, 20.035, 23.59, 21.672, 22.222, 22.123, 23.95, 23.504, 
+22.238, 23.142, 21.059, 21.573, 21.548, 20, 22.424, 20.615, 21.761, 
+22.874, 24.104, 23.748, 23.262, 22.907, 21.519, 22.025, 22.604, 
+20.894, 24.677, 23.673, 25.32, 23.583, 24.671, 24.454, 24.122, 
+24.252, 22.084, 22.991, 23.287, 23.049, 25.076, 24.037, 24.43, 
+24.667, 26.451, 25.618, 25.014, 25.11, 22.964, 23.981, 23.798, 
+22.27, 24.775, 22.646, 23.988, 24.737, 26.276, 25.816, 25.21, 
+25.199, 23.162, 24.707, 24.364, 22.644, 25.565, 24.062, 25.431, 
+24.635, 27.009, 26.606, 26.268, 26.462, 25.246, 25.18, 24.657, 
+23.304, 26.982, 26.199, 27.21, 26.122, 26.706, 26.878, 26.152, 
+26.379, 24.712, 25.688, 24.99, 24.239, 26.721, 23.475, 24.767, 
+26.219, 28.361, 28.599, 27.914, 27.784, 25.693, 26.881, 26.217, 
+24.218, 27.914, 26.975, 28.527, 27.139, 28.982, 28.169, 28.056, 
+29.136, 26.291, 26.987, 26.589, 24.848, 27.543, 26.896, 28.878, 
+27.39, 28.065, 28.141, 29.048, 28.484, 26.634, 27.735, 27.132, 
+24.924, 28.963, 26.589, 27.931, 28.009, 29.229, 28.759, 28.405, 
+27.945, 25.912, 26.619, 26.076, 25.286, 27.66, 25.951, 26.398, 
+25.565, 28.865, 30, 29.261, 29.012, 26.992, 27.897)
+births <- births*1000
+```
+
+the first step is to store the data in a time series object in R, so that we can use R’s many functions for analysing time series data. One way to do that is the base R function *ts*.
+
+by default ts assumes equal space time units of one year. For other time spans we can use the argument *frequency*. For example, if data is by month, use frequency=12. We can also change the starting point:
+
+```{r}
+birth.ts <- ts(births, frequency=12, start=c(1946, 1))
+head(birth.ts)
+```
+
+#### **Example**: Deaths in Puerto Rico
+
+number of deaths per month in Puerto Rico, according to the official deaths statistics of the government:
+
+![](deaths.maria.png)
+
+```{r}
+Deaths <- c(2744, 2403, 2427, 2259, 2340, 2145, 
+            2382, 2272, 2258, 2393, 2268, 2516,
+            2742, 2592, 2458, 2241, 2312, 2355,
+            2456, 2427, 2367, 2357, 2484, 2854,
+            2894, 2315, 2494, 2392, 2390, 2369, 
+            2367, 2321, 2928, 3040, 2671, 2820,
+            2821, 2448, 2643, 2218)
+pr.deaths.ts <-  ts(Deaths, frequency=12, 
+                    start=c(2015, 1))
+```
+
+#### **Example**: Dow Jones Industrial index
+
+Data set has the daily closing values of the Dow Jones Industrial Index from January 2000 to November 2018 and the weekly closing values from January 1985 to November 2018.
+
+the data set is available at [dow.jones.rds](http://academic.uprm.edu/wrolke/esma6836/dow.jones.rds)
+
+
+```{r}
+dow.jones <- readRDS("C:\\Users\\Wolfgang\\Dropbox\\teaching\\Computational-Statistics-with-R\\dow.jones.rds")
+head(dow.jones$Weekly)
+```
+
+Again we want to turn this into a time series  object. Here however we have the problem that the time variable is not equal spaced (sometimes the New York stock exchange is not open on a Monday or a Friday). One way to do this is to use the package *zoo*:
+
+
+```{r}
+library(zoo)
+dj.ts <- zoo(dow.jones$Weekly$Close,
+     order.by=as.Date(as.character(dow.jones$Weekly$Date)))
+```
+
+
+## Graphs
+
+There is an obvious graph for a time series, namely a line graph by time. A ts object already has a plot function, so
+
+#### **Example**: Births in New York
+
+```{r}
+library(ggfortify)
+autoplot(birth.ts)
+```
+
+#### **Example**: Deaths in Puerto Rico
+
+```{r}
+autoplot(pr.deaths.ts)
+```
+
+here we have a strong seasonal trend, deaths go up a lot in the winter. And of course we have a spike around September 2017!
+
+#### **Example**: Dow Jones
+
+```{r}
+autoplot(dj.ts)
+```
+
+
+`r hl()$hr()`
+
+In general a time series consists of some (or all) of these parts:
+
+-  a baseline  
+-  a trend  
+-  seasonal component(s) 
+-  unusual parts  
+-  random fluctuation
+
+#### **Example**: Deaths in Puerto Rico
+
+here we seem to have all of these:
+
+-  a baseline: roughly 2300 deaths per month   
+-  a trend: from around 2250 in 2015 to 2500 in 2018  
+-  seasonal component: winter month vs rest of year   
+-  unusual parts: September 2017
+
+One of the tasks in a time series analysis is to *decompose* the series into these parts.
+
+#### **Example**: Births
+
+```{r}
+births.dec <- decompose(birth.ts)
+plot(births.dec)
+```
+
+so we see a clear trend and seasonal component
+
+#### **Example**: Deaths in PR
+
+an alternative to decompose is the *stl* routine, which uses *loess* to do the fitting: 
+
+```{r}
+pr.deaths.dec <- stl(pr.deaths.ts, "periodic")
+plot(pr.deaths.dec)
+```
+
+again a clear trend and seasonal component.
+
+#### **Example**: Dow Jones
+
+```{r error=TRUE}
+dj.dec <- stl(dj.ts, "periodic")
+```
+
+and this gives an error. That is because this time series has irregular time points. It can be quite a chore to "fix" this problem. If the time periods are somewhat regular (in our case they are almost one week) it is easier to make a new series with a reguler time scale:
+
+```{r}
+dj.alt.ts <- ts(dow.jones$Weekly$Close, frequency = 52,
+                start=c(1985, 1))
+dj.alt.dec <- stl(dj.alt.ts, "periodic")
+plot(dj.alt.dec)
+```
+
+which shows a clear trend but not any seasonality. We also see that the variation is increasing over time.
+
+## ARIMA models
+
+As we said before, the special feature of a time series is a dependence between neighboring points. This suggests a way to analyse a time series by analysing the correlation between time points.
+
+#### **Example**: Births
+
+Let's define a new variable: $Y_i=X_i-X_{i-1}$, that is the change in the number of births from one month to the next.
+
+```{r}
+y <- diff(births)
+plot(y)
+```
+
+here we now longer have any pattern, which shows us that this series consisted only of a trend (which we eliminted in y).
+
+There are some R routines to do this for us for a time series:
+
+#### **Example**: PR Deaths
+
+```{r}
+acf(pr.deaths.ts)
+```
+
+which shows a clear seasonal pattern.
+
+`r hl()$hr()`
+
+the above is an example of a general model for time series called *ARIMA* (auto-regressive integrated moving average).
+
+Here are a couple of examples:
+
+-  AR(1) = ARIMA(1, 0, 0)
+
+$$
+X_i=c+\alpha_1 X_{i-1} +\epsilon_i
+$$
+
+for the births data we saw that $X_i-X_{i-1}$ was essentially random noise, so it seems that series can be modeled as an AR(1).
+
+-  AR(2) = ARIMA(2, 0, 0)
+
+$$
+X_i=c+\alpha_1 X_{i-1}+ \alpha_2 X_{i-2} +\epsilon_i
+$$
+-  MA(1)=AR(0, 0, 1)
+
+$$
+X_i=c+\beta_1 \epsilon_{i-1} + \epsilon_i
+$$
+
+finally ARIMA combines both variations.
+
+#### **Example**: Simulated data
+
+let's create some artifical data to see what is going on:
+
+```{r}
+eps <- rnorm(100)
+x <- sort(runif(100, 1, 10))
+x.ar <- ts(5 +  x[-1] + 0.2* x[-100] + eps[-100])
+plot(x.ar)
+acf(x.ar)
+x.ma <- ts(5 + 2* eps[-1] + eps[-100]) 
+plot(x.ma)
+acf(x.ma)
+```
+
+so the acf plot of x.ma shows us that indeed we have a moving average process, with a lag of 1 or 2.
+
+Fitting an ARIMA model can be done with the *auto.arima* routine from the *forcast* package:
+
+```{r}
+library(forecast)
+auto.arima(x.ar)
+```
+
+## Spectral Analysis
+
+The most general way to analyse a time series is a *spectral analysis*. In essence, we assume that 
+
+$$
+X_t=\sum_{j=1}^k \left(A_j \sin(2 \pi \nu_j t) +B_j \cos(2 \pi \nu_j t)  \right)
+$$
+and a spectral analysis amounts to estimating the parameters $A_j, B_j, \nu_j$.
+
+A fuller discussion of this is beyond our course. It would require first a discussion *Fourier analysis*, one of the most widely used technics in mathematics and enginering. 
+
+The usual starting point is a look at the *periodogram*
+
+#### **Example**: Births
+
+```{r}
+par(mfrow=c(2, 2))
+spec.pgram(birth.ts, spans = c(3, 3))
+spec.pgram(birth.ts, spans = c(3, 5))
+spec.pgram(birth.ts, spans = c(7, 11))
+spec.pgram(birth.ts, spans = c(7, 21))
+```
+
+and so we see that larger values of span do more smoothing and show the underlying patters
+
+#### **Example**: PR Deaths
+
+```{r}
+spec.pgram(pr.deaths.ts, span= c(3, 3))
+```
+
+#### **Example**: Dow Jones
+
+```{r}
+spec.pgram(dj.alt.ts, span= c(3, 9))
+```
+
+and as we know there is no seasonal component here.

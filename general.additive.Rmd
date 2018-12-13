@@ -1,0 +1,207 @@
+---
+title: Generalized Additive Models
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+For a linear regression we have a dependent variable Y and a set of predictors $x_1, .., x_n$ and a model of the form
+$$
+Y = \alpha + \sum \beta_j x_j + \epsilon
+$$
+Generalized additive models extend this in two ways: first we replace the linear terms $\beta_j x_j$ by non-linear functions, to get
+$$
+Y = \alpha + \sum f(x_j;\beta_j) + \epsilon
+$$
+
+Second we can take the same step as before in going from linear models to general linear models to fit problems where Y is a categorical variable.
+
+A special case we have already discussed is where the functions are polynomials.
+
+We can also "mix" linear and generalized additive models. Consider
+$$
+Y = \alpha + \beta_1 x_1+  f(x_2;\beta_2) + \epsilon
+$$
+here we have a model linear in X1 and additive in X2. Such a model is called "semiparametric".
+
+#### **Example**: Oil in Rocks
+
+We have measurements on four cross-sections of each of 12 oil-bearing rocks. The measurements are the end product of a complex image-analysis and represent the total area, total perimeter and a measure of 'roundness' of the pores in the rock cross-section. 
+
+```{r}
+head(rock.oil)
+```
+
+```{r}
+ggplot(data=rock.oil, aes("", perm)) +
+  geom_boxplot()
+```
+
+this looks a bit skewed, so we should try a log transform:
+
+```{r}
+ggplot(data=rock.oil, aes("", log(perm))) +
+  geom_boxplot()
+```
+
+and that looks better, so
+
+```{r}
+rock.oil$perm <- log(rock.oil$perm)
+colnames(rock.oil)[4] <- "log.perm"
+```
+
+Next the predictors:
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(ggplot(data=rock.oil, aes(area, log.perm)) +
+           geom_point() + 
+           geom_smooth(method = "lm", se=FALSE),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=rock.oil, aes(peri, log.perm)) +
+           geom_point() + 
+           geom_smooth(method = "lm", se=FALSE),
+    vp=viewport(layout.pos.row=1, layout.pos.col=2))
+print(ggplot(data=rock.oil, aes(shape, log.perm)) +
+           geom_point() + 
+           geom_smooth(method = "lm", se=FALSE),
+    vp=viewport(layout.pos.row=2, layout.pos.col=1))
+```
+
+we begin with a linear model:
+
+```{r}
+fit.lin <- lm(log.perm~., data=rock.oil)
+df <- data.frame(Residuals=resid(fit.lin), 
+            Fits = fitted(fit.lin))
+ggplot(data=df, aes(Fits, Residuals)) +
+            geom_point() +
+            geom_hline(yintercept = 0)
+```
+and that is not so bad.
+
+Next let's fit the generalized additive model:
+ 
+```{r}
+library(mgcv)
+fit.gam <- gam(log.perm ~ s(area) + s(peri) + s(shape),
+               data=rock.oil)
+```
+ 
+Notice the terms s() which means we are using splines.
+
+Is this model better than the simple linear one? We can compare the two using ANOVA, done in  
+
+```{r}
+anova(fit.lin, fit.gam)
+```
+
+ It appears the more complicated model is not actually better than the old one (p=0.125).
+
+What is this new model? In 
+
+```{r}
+par(mfrow=c(2, 2))
+plot(fit.gam, se = TRUE)
+```
+
+we see the fitted line plots, which do look fairly linear.
+
+#### **Example**: Kyphosis
+
+This dataset is about Kyphosis, a spinal deformity in children that occurs after certain surgeries on the spine. 
+
+The variables are:
+
+1) Kyphosis: 1 if kyphosis is present, 0 otherwise.  
+2) Age: age of the child in month.  
+3) Number: the number of vertebrae involved in the spinal operation.  
+4) Start: the beginning of the range of the vertebrae   involved in the spinal operation.  
+ 
+```{r}
+head(kyphosis)
+```
+ 
+the goal is to predict whether a child will develop kyphosis. So this is a binary outcome, and we will use logistic regression.
+
+Let's begin with some box plots:
+
+```{r}
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(ggplot(data=kyphosis, aes(Kyphosis, Age)) +
+           geom_boxplot(),
+    vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(ggplot(data=kyphosis, aes(Kyphosis, Number)) +
+           geom_boxplot(),    
+      vp=viewport(layout.pos.row=1, layout.pos.col=2))
+print(ggplot(data=kyphosis, aes(Kyphosis, Start)) +
+           geom_boxplot(),    
+      vp=viewport(layout.pos.row=2, layout.pos.col=1))
+```
+
+so it seems all predictors are useful.
+
+```{r}
+fit.glm <- glm(Kyphosis ~ ., family = binomial, 
+               data = kyphosis)
+summary(fit.glm)
+```
+ 
+which suggests that only Start is strongly predictive.
+
+It is possible to show that Number is not very useful here (using anova), and we will continue with Age and Start:
+
+```{r}
+fit.sa.gam <- gam(Kyphosis ~ s(Age) + s(Start), 
+                 family = binomial, data = kyphosis)
+par(mfrow = c(1, 2))
+plot(fit.sa.gam, se = TRUE)
+```
+
+From this it seems a model quadratic in Age might work. For Start we see that its spline appears piecewise linear, flat up to about 12 and then with a negative slope. This also makes sense from the background of the data, because values of Start up to 12 correspond to the thoracic region of the spine and values greater than 12 belong to the lumbar region. We will therefore try and fit a model of the form
+
+$$
+f(x) = a+b(x-12)I_{[12, \infty)}(x)
+$$
+Notice that this model fits a continuous function. In R we can do this by including a term I((Start-12)\*(Start>12)). The 'I' is needed so R does not interpret the '*' as meaning interaction. Comparing this with the gam model we see that this model is as good as the generalized additive one.
+
+```{r}
+fit.sa.glm <- glm(Kyphosis ~ poly(Age, 2) + 
+                    I((Start - 12) * (Start > 12)), 
+                  family = binomial, data = kyphosis)
+anova(fit.sa.gam, fit.sa.glm)
+```
+
+What does this new model look like?
+
+```{r}
+x <- seq(1, 200, length = 100)
+y <-  c(5, 10, 13, 14)
+xy <- expand.grid(x, y)
+df <- data.frame(Age=xy[, 1], Start=xy[, 2])
+df$Prob <- predict(fit.sa.glm, df, type = "response")
+ggplot(df, aes(Age, Prob)) +
+  geom_line() +
+  facet_wrap(~Start)
+```
+
+where we can see that the highest risk of kyphosis is for children around age 100 month (aka 8 years) but it diminishes the higher up the Start is.
+

@@ -1,0 +1,234 @@
+---
+title: Nonlinear Models
+header-includes: \usepackage{color}
+output:
+  html_document: default
+  pdf_document:
+    fig_caption: no
+---
+<style>
+table, th, td { text-align:right; }
+th, td {padding: 10px;}
+</style>
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+whichcomp <- strsplit(getwd(),"/")[[1]][3]
+load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
+library(knitr)
+opts_chunk$set(fig.width=6, fig.align = "center", 
+      out.width = "70%", warning=FALSE, message=FALSE)
+library(ggplot2)
+library(grid)
+```
+`r hl()$basefontsize()`
+
+#### **Example**: Fabric Wear
+
+Results from an experiment designed to determine how much the speed of a washing machine effects the wear on a new fabric. The machine was run at 5 different speeds (measured in rpm) and with six pieces of fabric each.
+
+```{r}
+head(fabricwear)
+```
+
+The scatterplot of wear by speed shows a strong but non-linear relationship:
+
+```{r}
+ggplot(data=fabricwear, aes(Speed, Wear)) +
+  geom_point()+
+  geom_smooth(method = "lm", se=FALSE)
+```
+
+How strong is a difficult question, because Pearson's correlation coefficient won't work here. If we tried lm we would see in the residual vs fits plot that there is a problem with the assumption of a linear model:
+
+```{r}
+fit <- lm(Wear~Speed, data=fabricwear)
+df <- data.frame(Fits=fitted(fit),
+                 Residuals=resid(fit))
+ggplot(df, aes(Fits, Residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+So the question is: how do we fit models other than straight lines?
+
+There are two basic things we can try. The first is something we have already done, namely the **log transformations**
+
+```{r echo=FALSE}
+attach(fabricwear)
+pushViewport(viewport(layout = grid.layout(2, 2)))
+print(splot(Wear, log(Speed), 
+            add.line=1, return.graph = TRUE) ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(splot(log(Wear), log(Speed), 
+            add.line=1, return.graph = TRUE) ,
+  vp=viewport(layout.pos.row=1, layout.pos.col=2))        
+print(splot(log(Wear), Speed, 
+            add.line=1, return.graph = TRUE) ,
+  vp=viewport(layout.pos.row=2, layout.pos.col=1))
+  
+```
+
+unfortunately non of these looks very good
+
+Some of these have names:
+
+- log(y) vs. x is called an **exponential model**
+
+- log(y) vs. log(x) is called a **power model**
+
+The other solution to our problem is to fit a **polynomial model**:
+
+**Linear** $y=\beta_0+\beta_1 x$
+
+**Quadratic** $y=\beta_0+\beta_1 x+\beta_2 x^2$
+
+**Cubic** $y=\beta_0+\beta_1 x+\beta_2 x^2+\beta_3 x^3$
+
+and so on
+
+How do we fit such a model? We simply calculate the powers and use them in lm:
+
+```{r}
+Speed2 <- Speed^2
+quad.fit <- lm(Wear~Speed+Speed2, data=fabricwear)
+quad.df <- data.frame(Fits=fitted(quad.fit),
+                 Residuals=resid(quad.fit))
+ggplot(quad.df, aes(Fits, Residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+What does such a curve look like? 
+
+```{r}
+x <- seq(min(fabricwear$Speed), 
+         max(fabricwear$Speed),
+         length=250)
+y <- coef(quad.fit)[1] + 
+     coef(quad.fit)[2]*x +
+     coef(quad.fit)[3]*x^2
+df.tmp <- data.frame(x=x, y=y)
+ggplot(data=fabricwear, aes(Speed, Wear)) +
+  geom_point() +
+  geom_line(data=df.tmp, aes(x, y), 
+            inherit.aes = FALSE,
+            color="blue", size=1.2)
+```
+
+There is however something not so good about this solution: our x values are of the size 100, their square is of order 10000. Using varibles with very different sizes can lead to troubles in a regression. Also we have
+
+```{r}
+cor(fabricwear$Speed, Speed2)
+```
+
+and again using highly correlated predictors is an issue. One way around these problems is to use the *poly* command:
+
+```{r}
+poly.fit <- lm(Wear~poly(Speed, 2), data=fabricwear)
+coef(poly.fit)
+```
+
+The poly command does two things: it scales all the variables so that their mean is 0 and their standard deviation is 1, and it changes them in such a way that they are uncorrelated. This makes the regression calculations much more stable.
+
+If the goal is prediction, this is fine:
+
+```{r}
+predict(quad.fit, 
+        newdata=data.frame(Speed=150, Speed2=150^2))
+predict(poly.fit, newdata=data.frame(Speed=150))
+```
+
+but when it comes to getting the actual model, we would have to "reverse" the calculations done by poly, and we don't even know what those were, exactly.
+
+There is an intermediate solution that sometimes works well: scale the x variable first:
+
+```{r}
+mn <- mean(fabricwear$Speed)
+s <- sd(fabricwear$Speed)
+x <- (fabricwear$Speed-mn)/s
+x2 <- x^2
+round(c(mn, s, cor(x, x2)), 2)
+quad.scale.fit <- lm(fabricwear$Wear~x+x2)
+coef(quad.scale.fit)
+```
+
+so first we also got uncorrelated predictors (that is just here, but in general the correlations will be low). Also:
+
+$$
+\begin{aligned}
+&x=\frac{\text{Speed}-150}{28.77}\\
+&y=31.2+7.87x+2.98x^2 \\
+&y=31.2+7.87\frac{\text{ Speed}-150}{28.77}+2.98\left(\frac{\text{ Speed}-150}{28.77}\right)^2    = \\
+& 31.2+0.2735\text{ Speed}-41.03+\\
+&0.0036\text{ Speed}^2 -1.08\text{ Speed}  +81= \\
+&71.17-0.806\text{ Speed}+0.0036\text{ Speed}^2
+\end{aligned}
+$$
+and that is the same as
+
+```{r}
+coef(quad.fit)
+```
+
+### Prediction
+
+Again we can use the predict command to do prediction, but there are some things we need to be careful with:
+
+```{r}
+predict(quad.fit, 
+            newdata=data.frame(Speed=150, 
+                               Speed2=150^2))
+lwear <- log(Wear)
+lspeed <- log(Speed)
+log.fit <- lm(lwear~lspeed)
+exp(predict(log.fit, 
+            newdata=data.frame(lspeed=log(150))))
+```
+
+How about interval estimation? Let's do a simple simulation: consider the model $y=x^2$. It is both a quadratic model and linear in log-log, so we should be able to fit it either way:
+
+```{r cache=TRUE}
+B <- 1000
+x <- 1:100/100
+out <- matrix(0, 1000, 6)
+lx <- log(x)
+x2 <- x^2
+for(i in 1:B) {
+  y <- x^2 + rnorm(100,0, 0.07)
+  pf <- lm(y~x+x2)
+  out[i, 1:3] <- predict(pf, 
+        newdata=data.frame(x=0.5, x2=0.25),
+        interval="confidence")
+  ly <- log(y)
+  lf <- lm(ly~lx)
+  out[i, 4:6] <- exp(predict(lf,
+        newdata=data.frame(lx=log(0.5)),
+        interval="confidence"))  
+}
+```
+
+```{r}
+#quadratic model
+sum(out[, 2]<0.5^2 & 0.5^2<out[, 3])/B
+#log transform
+sum(out[, 5]<0.5^2 & 0.5^2<out[, 6])/B
+```
+
+so this works fine for quadratic model but fails misserably for the log transform. 
+
+Why is that? Part of the problem is the error term. Note that what we really have is
+
+$$
+y=x^2+\epsilon
+$$
+
+so taking logs leads to 
+
+$$
+\log y = \log (x^2+\epsilon)
+$$
+and not to what we are fitting, namely
+
+$$
+\log y = \log (x^2 ) +\epsilon
+$$
