@@ -1,29 +1,22 @@
 ---
-title: Comparing the Means of Several Populations - ANOVA
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-library(wolfr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
-options(scipen = 999)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
 
+## Comparing the Means of Several Populations - ANOVA
+
+### Basic Test 
 
 #### **Example**: Mothers Cocain Use and Babies Health
 
@@ -91,6 +84,8 @@ b. groups have equal variance
 Here one uses the rule of thumb: if the largest sample standard deviation is not more than three times the smalles, it is ok. 
 
 Here: 3*2.5 = 7.5 > 3.6, ok
+
+### Multiple Comparison
 
 Often if the null of no difference is rejected, one wants to go a step further and do a pairwise comparison:
 

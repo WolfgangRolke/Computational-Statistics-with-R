@@ -1,30 +1,26 @@
 ---
-title: Subset Selection and Ridge Regression
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## Subset Selection and Ridge Regression
+
+### Subset Selection
 
 We have previously discussed the issue of subset selection. There we use Mallow's C~p~ Statitstic to find the best model. This calculates all possible models, and if there are k predictors there are $2^k$ such models. Although there are very fast algorithms available for this, it is not feasable to do it for much more than 30 predictors. So what do we do if we have more than that?
 
-## Forward/Backward Selection
+-  **Forward/Backward Selection**
 
 One idea is as follows:
 
@@ -159,7 +155,9 @@ rownames(tmp)[-1]
 
 which is not the same as either best subset or forward selection.
 
-Finally, there is the method of *stepwise selection*. Here in each step we either add or drop a variable. The *step* command does it for us. Notice that it uses *AIC* by default.
+-  **stepwise selection**
+
+Here in each step we either add or drop a variable. The *step* command does it for us. Notice that it uses *AIC* by default.
 
 ```{r}
 fit <- lm(Mortality~., data=newair)
@@ -170,7 +168,7 @@ this seems the easiest to use (certainly in terms of what we have to type into R
 
 There has been a lot of research on the relative merits of these methods. There are in fact many Statisticians who advise against their use. As an alternative we can consider
 
-## Ridge Regression
+### Ridge Regression
 
 One problem with the above methods is that they are all or nothing: a predictor either is in the final model or is not. Ridge regression takes a different approach: each variable gets a "weight" in how much it contributes to the final model.
 
@@ -200,7 +198,9 @@ fit <- linearRidge(Mortality~., data=newair)
 summary(fit)
 ```
 
-An alternative to ridge regression is the *Lasso*. It uses
+###  Lasso
+
+This is similar to ridge regression but it uses
 
 $$
 \sum_{i=1}^n \left( y_i - \beta_0 -\sum_{j-1}^p \beta_jx_{ij}\right)^2 + \lambda \sum_{j-1}^p |\beta_j| 

@@ -1,30 +1,24 @@
 ---
-title: Hypothesis Testing
 header-includes: \usepackage{color}
+                \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+                 
+## Hypothesis Testing
 
 First off, hypothesis testing is a rather complicate business. We will here discuss just one method for developing a hypothesis tests. Also, there are many issues envolved in testing that are not of a mathematical nature. Unless you have previously taken a course on Statistics I highly recommend that you read the discussion in [ESMA 3101 - Hypothesis Testing](http://academic.uprm.edu/wrolke/esma-3015-3101/hyptest.html). 
 
-## General Problem Statement
+### General Problem Statement
 
 As before we have the following general setup: we have data $x_1, .., x_n$ from some density $f(x|\theta)$. We want to test 
 
@@ -33,7 +27,7 @@ H_0: \theta \in \Theta_0 \text{ vs }H_a: \theta \notin \Theta_0
 $$
 for some subset of the parameter space $\Theta_0$.
 
-####  **Example**: : Coin Tossing
+####  **Example**:  Coin Tossing
 
 we flip a coin 1000 times and 549 heads. Is this a fair coin?
 
@@ -93,9 +87,7 @@ beta.sample <-
 beta.sample[c(1:5, 196:200)]
 ```
 
-## Basic Concepts of Hypothesis Testing
-
-###  Critical Region CR
+###  Critical Region of a Test
 
 this is the set of points $(x_1, .., x_n)$ that if this were the observed data we would reject the null hypothesis.
 
@@ -183,7 +175,7 @@ A CR could be constructed by noting that according to the *central limit theorem
 
 we don't even know how to find the mle's analytically, so this won't work.
 
-## p value of a test
+### The p value
 
 The idea of the p value is as follows. Suppose we repeat the exact same experiment, how likely is it to observe the same outcome, or something even less likely, as what we just saw, assuming the null hypothesis is true? 
 
@@ -247,7 +239,7 @@ The power of a test has many uses:
 
 Next we will discuss a general method for deriving hypothesis tests called the
 
-## The likelihood ratio test
+### The likelihood ratio test
 
 The *likelihood ratio test statistic* is defined by 
 

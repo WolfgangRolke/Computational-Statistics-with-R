@@ -1,36 +1,28 @@
 ---
-title: Basic Inferences
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-library(wolfr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
-options(scipen = 999)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## Basic Inferences
 
 In this section we will discuss some of the standard (frequentist) methods in Statistics.
 
-## Inference for a Population Mean
+### Inference for a Population Mean
 
 The basic R command for inference for a population mean is *t.test*.
 
-### Confidence Intervals
+-  **Confidence Intervals**
 
 #### **Example**: Mothers Cocain Use and Babies Health
 
@@ -63,7 +55,7 @@ ggplot(df, aes(sample=x)) +
 
 This is fine. 
 
-### Hypothesis Testing
+-  **Hypothesis Testing**
 
 #### **Example**: Resting Period of Monarch Butterflies
 
@@ -98,7 +90,7 @@ ggplot(df, aes(sample=x)) +
 
 looks good.
 
-### Power Calculations
+-  **Power Calculations**
 
 The power of a test is the probability to correctly reject the null if the null is false. The power will always depend on an assumed value for the mean.
 
@@ -201,7 +193,7 @@ ggplot(df, aes(Mean, Power)) +
 ```
 
 
-### Sample Size
+-  **Sample Size**
 
 so, if the true mean resting period is 120.7 seconds the power is 72%. What sample size would we need to have a power of 95%
 
@@ -236,7 +228,7 @@ so a 95% confidence interval has an error of 11. If we wanted an error of 5 we w
 round((qnorm(0.975)*sd(butterflies$RIP.sec.)/5)^2)
 ```
 
-## Inference for a Population Proportion
+### Inference for a Population Proportion
 
 The R routine for inference for a proportion (or a probability or a percentage) is *binom.test*. This implements a method by Clopper and Pearson (1934). This method is exact and has no assumptions.
 
@@ -299,7 +291,7 @@ diff(as.numeric(binom.test(n/2, n)$conf.int)/2)
 
 There is something quite remarkable about this result!
 
-## Correlation 
+### Correlation 
 
 #### **Example** UPR Admissions data
 
@@ -353,7 +345,7 @@ cor.test(draft$Draft.Number, draft$Day.of.Year)$p.value
 8) $p=0.0000 <\alpha = 0.05$, so we reject the null hypothesis,
 9) There is a statistically significant relationship between Day of Year and Draft Number.  
 
-## Categorical Data Analysis - Tests for Independence
+### Categorical Data Analysis - Tests for Independence
 
 #### **Example**: Drownings in Los Angeles
 

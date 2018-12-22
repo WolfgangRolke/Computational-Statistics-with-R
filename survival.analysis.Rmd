@@ -1,26 +1,22 @@
 ---
-title:  Survival Analysis
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+# Special Topics
+
+## Survival Analysis
 
 Survival Analysis is concerned with the distributions of lifetimes, often human as in Medical Sciences but also of components and machines.
 
@@ -30,7 +26,7 @@ Here is a *life table*, for the USA in 2016. Numbers are per 100,000 population:
 
 ```{r}
 life.us <- read.csv("us.life.table.csv")
-kableExtra::kable(life.us)
+kable.nice(life.us)
 ```
 
 so this tells us that of any 100,000 men 97148.16 survived to age 30, or about $2850/100000*100\% = 2.8\% had died, compared to $1.5\%$ of the women. 
@@ -206,7 +202,7 @@ ggplot(data=df, aes(Time, Survival, color=Status)) +
 ```
 
 
-`r hl()$hr()`
+### Censored Data
 
 The most distinctive feature of survival analysis is **censoring**. Say we are testing a new treatment for late-stage stomach cancer. At the beginning of the study we select 100 cancer patients and begin treatment. After 1 year we wish to study the effectiveness of the new treatment. At that time 47 of the patients have died, and for them we know the number of days until death. For the other 53 patients we know that they have survived 365 days but we don't know how much longer they will live. How do we use all the available information?
 
@@ -352,7 +348,7 @@ fit <- glm(time ~ ag + log(wbc), family = Gamma(log),
 summary(fit, dispersion = 1)
 ```
 
-## Cox Proportional Hazard Model
+### Cox Proportional Hazard Model
 
 A nonparametric approach to survival data was first introduced by Cox in 1972. Here we model the hazard function h as follows: there is a baseline hazard $h_0(t)$ which is modified by covariates, so the hazard function for any individual case is 
 $$

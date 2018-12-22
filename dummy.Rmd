@@ -1,26 +1,21 @@
 ---
-title: Models with dummy variables
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
+
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## Models with Categorical Predictors
 
 #### **Example**: Environmental, Safety and Health Attitudes
 
@@ -237,7 +232,7 @@ nw <- data.frame(Yrs.Serv=0:10, Sex=rep(0, 11))
 round(predict(fit, nw, interval="prediction"), 2)
 ```
 
-## Lines and Interaction
+### Lines and Interaction
 
 Above we explained the problem of using categorical predictors in a regression model in terms of parallel lines vs. two independent lines. But in fact this another example of the issue of *interaction*, or more generally of a relationship between the predictors. Parallel lines are ok if the categorical and the continuous predictors are essentially independent. Often terms such as Yrs Serv\*SexCode are also called *interaction terms*.
 

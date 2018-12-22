@@ -1,26 +1,22 @@
 ---
-title: Simulation
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
+  html_document: default
   pdf_document:
     fig_caption: no
-  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## Simulation
+
+### Basic Idea
 
 We already used simulation in a couple of situations. In this section we will take a closer look.
 
@@ -72,7 +68,7 @@ and we can find the p-value with
 
 So here we did the test via simulation, without any theory!
 
-## Simulation Error
+### Simulation Error
 
 Everytime we run a simulation, the computer generates different data and so the answer comes out a bit different as well. But how different?
 
@@ -193,7 +189,7 @@ sum(sim.data>mean(norm.data))/B
 
 In essence this has a bit of a Bayesian flavour, we just introduced a prior for $\sigma$!
 
-##  Permutation Tests
+###  Permutation Tests
 
 There is a class of methods essentially built on simulation. Here is an 
 

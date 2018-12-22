@@ -1,27 +1,20 @@
 ---
-title: General Info for Homeworks
 header-includes: \usepackage{color}
+                  \usepackage{float}
 output:
   html_document: default
   pdf_document:
     fig_caption: no
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-library(wolfr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## General Info for Homeworks
 
 -  if you don't follow the instructions given below it <font color="red">WILL</font> cost you points!
 

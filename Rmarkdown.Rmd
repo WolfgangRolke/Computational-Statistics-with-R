@@ -1,27 +1,21 @@
 ---
-title: R Markdown, HTML and Latex
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
-
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
 
+## R Markdown, HTML and Latex
+
+### R Markdown
 
 R Markdown is a program for making dynamic documents with R. An R Markdown document is written in *markdown*, an easy-to-write plain text format with the file extension .Rmd. It can contain chunks of embedded R code. It has a number of great features:
 
@@ -31,7 +25,7 @@ R Markdown is a program for making dynamic documents with R. An R Markdown docum
 
 In recent years I (along with many others) who work a lot with R have made Rmarkdown the basic way to work with R. So when I work on a new project I immediately start a corresponding R markdown document. 
 
-### Get Started
+`r hl()$hr()`
 
 to start writing an R Markdown document open RStudio, File > New File > R Markdown. You can type in the title and some other things.
 
@@ -50,7 +44,7 @@ YAML stands for *Yet Another Markup Language*. It has become a standard for many
 
 Then there is other stuff you should erase. Next File > Save. Give the document a name with the extension .Rmd
 
-## Basic R Markdown Syntax
+### Basic R Markdown Syntax
 
 for a list of the basic syntax go to
 
@@ -61,11 +55,11 @@ or to
 [https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet)
 
 
-## Embedded Code
+#### Embedded Code
 
 There are two ways to include code chunks (yes, that's what they are called!) into an R Markdown document:
 
-###  stand alone code
+####  stand alone code
 
 simultaneously enter CTRL-ALT-i and you will see this:
 
@@ -118,7 +112,7 @@ there are a number of useful arguments:
 -  error=TRUE  (if there are errors in the code R normaly terminates the parsing (executing) of the markdown document. With this argument it will ignore the error, which helps with debugging)  
 -  engine='Rcpp' (to include C++ code)
 
-###  inline code 
+####  inline code 
 
 here is a bit of text:
 
@@ -145,7 +139,7 @@ If you have to override these defaults just include that in the specific chunk.
 
 To create the output you have to "knit" the document. This is done by clicking on the *knit* button above. If you click on the arrow you can change the output format.
 
-#### HTML vs Latex(Pdf)
+### HTML vs Latex(Pdf)
 
 In order to knit to pdf you have to install a latex interpreter. My suggestion is to use [Miktex](https://miktex.org/), but if you already have one installed it might work as well.
 

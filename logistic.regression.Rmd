@@ -1,5 +1,6 @@
 ---
 title: Logistic Regression - General Linear Models
+                 \usepackage{float}
 header-includes: \usepackage{color}
 output:
   pdf_document:

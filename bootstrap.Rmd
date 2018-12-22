@@ -1,26 +1,20 @@
 ---
-title: The Bootstrap
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## The Bootstrap
 
 In the previous section we used simulation from the true distribution to derive statistical methods. But what do we do if we don't know the distribution?
 
@@ -157,11 +151,11 @@ x <- rgamma(250, 2.5, 1/2)
 sd(bootstrap(x, 500, T.fun)$thetastar)
 ```
 
-## Bootstrap Confidence Intervals
+### Bootstrap Confidence Intervals
 
 There are two standard technics for using the Bootstrap to find confidence intervals:
 
-### Normal Theory
+-  **Normal Theory Intervals**
 
 Let's continue the discussion of the skewness, and put a 95% confidence interval on the estimates:
 
@@ -198,7 +192,7 @@ round(T.fun(x.gamma) +
 
 Notice that here there is no $/\sqrt{n}$, because sd(thetastar) is already the standard deviation of the estimator, not of an individual observation.
 
-### Percentile Intervals
+-  **Percentile Intervals**
 
 An alternative way to find confidence intervals is by estimating the population  quantiles of the bootstrap sample with the sample quantiles:
 
@@ -210,7 +204,7 @@ round(sort(thetastar.gamma)[2000*c(0.025, 0.975)], 2)
 
 and so in the normal case 0 is in the interval, indicating that this data set might well come from a symmetric distribution, whereas in the gamma case this is ruled out.
 
-### More Advanced Intervals
+-  **More Advanced Intervals**
 
 There are a number of ways to improve the performance of bootstrap based confidence intervals. One of the more popular ones is called *nonparametric bias-corrected and accelerated (BCa) intervals*. The package *bootstrap* has the routine *bcanon*. The intervals are the found via the percentile method but the percentiles are found with
 

@@ -1,34 +1,27 @@
 ---
-title: Descriptive Statistics 
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
-
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-library(wolfr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
-options(scipen = 999)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+# General Statistics
+
+## Descriptive Statistics
 
 In general in Statistics we distinguish between quantitative (= numerical) and categorical (= qualitative) data. The main difference is that for quantitative data doing arithmetic makes sense, for example calculating the mean. 
 
 Note that just because a data set has digits, it is not necessarily quantitative. For example, digits are often used as labels.
 
-## Basic Summaries and Graphs
+`r hl()$hr()`
 
 Consider the **upr admissions** data. Here are some simple things to do when looking at this kind of data:
 
@@ -174,7 +167,7 @@ ggplot(upr, aes(Year, Freshmen.GPA)) +
   labs(x="Year", y="GPA after Freshmen Year")
 ```
 
-## Normal Probability Plot
+### Normal Probability Plot
 
 An important graph is the *normal probability plot*, which plots the sample quantiles vs the population quantiles of a normal distribution:
 

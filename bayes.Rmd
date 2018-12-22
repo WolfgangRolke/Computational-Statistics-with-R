@@ -1,30 +1,24 @@
 ---
-title: Bayesian Analysis
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## Bayesian Statistics
 
 Our previous discussions focused on statistical methods that belong to the *Frequentist School*. There is however an entirely different apporach to Statistics called *Bayesian*.
 
-## Prior and Posterior Distribution
+### Prior and Posterior Distribution
 
 Say we have a sample $\textbf{x}=(x_1,..,x_n)$, iid from some probability density $f(.; \theta)$, and we want to do some inference on the parameter $\theta$.
 
@@ -212,7 +206,7 @@ curve(dnorm(x,d, cc), -3, 2, add=TRUE)
 Note that one thing a frequentist and a Bayesian analysis have in common is the likelihood function.
 
 
-## Inference
+### Bayesian Inference
 
 In a Bayesian analysis any inference is done from the posterior distribution. For example, point estimates can be found as the mean, median, mode or any other measure of central tendency.
 

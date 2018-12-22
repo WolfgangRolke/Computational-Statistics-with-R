@@ -1,26 +1,20 @@
 ---
-title: Nonparametric Density Estimation
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## Nonparametric Density Estimation
 
 #### **Example**: Old Faithful Guyser
 
@@ -37,7 +31,7 @@ geom_histogram(color = "black",
 
 clearly the distribution of this data is non standard. We previously fit a mixture of normal densities to the data. In this section we will consider several non parametric methods. The basic problem is to estimate the density $f(x)$ by $\hat{f}(x)$ for each x.
 
-## Kernel Density Estimation.
+### Kernel Density Estimation.
 
 The most commonly used method is called *kernel density estimation*. The idea is to average over the data points, giving greater weight to points near x. In general we have
 
@@ -97,7 +91,7 @@ geom_histogram(aes(y = ..density..),
 
 and it is clear that for small values of h we get a very ragged (under-smoothed) estimate whereas for an h to large it is the other way around.
 
-## Other Methods
+`r hl()$hr()`
 
 There is a long list of density estimation methods and associated routines. For a review see [Density estimation in R](https://vita.had.co.nz/papers/density-estimation.pdf). Two libraries worth knowing about are
 
@@ -131,7 +125,7 @@ contour(est$x1, est$x2, est$fhat)
 persp(est$fhat)
 ```
 
-## Boundary Problem
+### Boundary Problem
 
 Most methods encounter problems when the true density does not go to 0 at the edges:
 

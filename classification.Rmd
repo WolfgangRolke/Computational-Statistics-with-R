@@ -1,26 +1,22 @@
 ---
-title: Introduction to Classification
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
   html_document: default
   pdf_document:
     fig_caption: no
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+# Classification
+
+## Introduction to Classification
 
 In general classification is concerend with the following problem: our population consists of several distinct groups. We have a set of data points from each group with associated measurements. We want to derive a procedure that tells us which group a new observation might belong to.
 
@@ -126,6 +122,7 @@ ggplot(data=ex3(n=150), aes(x, y,color=group)) +
 ```
 
 `r hl()$hr()`
+
 In one sense this is not a new problem, it is simply a regression problem where the response variable is discrete.
 
 For this we could code a response variable y as 0 if "green" and 1 if "red" if there are two groups (models 1 and 2) or with 0, 1 and 2 if there are three groups (model 3). Then we run the linear regression of y on x1 and x2.
@@ -142,7 +139,7 @@ make.grid <- function(df) {
   y <- seq(min(df$y), max(df$y), length=100)
   expand.grid(x=x, y=y) 
 }
-do.graph <- function() {
+do.graph <- function(df, df1) {
   print(ggplot(data=df, aes(x, y, color=group)) +
    geom_point(size=2) +
    theme(legend.position="none") +
@@ -160,7 +157,7 @@ df$Code <- ifelse(df$group=="A", 0, 1)
 fit <- lm(Code~x+y, data=df)
 df1 <- make.grid(df)
 df1$group <- ifelse(predict(fit, df1)<0.5, "A", "B")
-do.graph()
+do.graph(df, df1)
 ```
 
 
@@ -170,7 +167,7 @@ df$Code <- ifelse(df$group=="A", 0, 1)
 fit <- lm(Code~x+y, data=df)
 df1 <- make.grid(df)
 df1$group <- ifelse(predict(fit, df1)<0.5, "A", "B")
-do.graph() 
+do.graph(df, df1) 
 ```
 
 ```{r}
@@ -182,12 +179,12 @@ df1 <- make.grid(df)
 tmp <- predict(fit, df1)
 df1$group <- ifelse(tmp<2/3, "A", "B")
 df1$group[tmp>4/3] <-"C"
-do.graph()
+do.graph(df, df1)
 ```
 
 this seems to work ok for examples 1 and 3, not so much for 2.
 
-we will use these examples quite a bit, so
+we will use these examples quite a bit, so lets write a routine that generates data from any of them:
 
 ```{r}
 gen.ex <- function(which, n=50) {
@@ -248,7 +245,7 @@ ggplot(data=df, aes(x, y, color=group)) +
               slope=-coef(fit)[2]/coef(fit)[3])
 ```
 
-`r hl()$hr()`
+### Misclassification Rate
 
 One thing that sets a classification problem apart from regression is that here we have an obvious way to judge how good a method is, namely the **miss-classification rate**: What percentage of the observations are given the wrong label?
 
@@ -288,6 +285,8 @@ pred[tmp>4/3] <- "C"
 msr(df$group, pred)
 ```
 
+### Overfitting and Cross-validation
+
 Of course these misclassification rates are to optimistic: we calculated it on the same data set that we fit on. We should always *train* and *test* on different data sets, maybe using cross-validation:
 
 ```{r}
@@ -314,7 +313,7 @@ df$Code <- ifelse(df$group=="A", 0, 1)
 fit <- lm(Code~x+y, data=df)
 df1 <- make.grid(df)
 df1$group <- ifelse(predict(fit, df1)<0.5, "A", "B")
-do.graph()
+do.graph(df, df1)
 ```
 
 shows us why: here a linear decision boundary clearly won't work. So how about a quadratic one?
@@ -329,7 +328,7 @@ df1$x2 <- df1$x^2
 df1$y2 <- df1$y^2
 df1$xy <- df1$x*df1$y
 df1$group <- ifelse(predict(fit, df1)<0.5, "A", "B")
-do.graph()
+do.graph(df, df1)
 ```
 
 and that looks much better!

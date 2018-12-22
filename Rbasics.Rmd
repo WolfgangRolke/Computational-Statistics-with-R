@@ -1,27 +1,19 @@
 ---
-title:  R Basics I
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
-
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%")
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
-
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## R Basics I
 
 To start run
 
@@ -51,7 +43,7 @@ rm(x)
 
 the **<-** is the *assignment* character in R, it assigns what is on the right to the symbol on the left. (Think of an arrow to the left)
 
-##  Data Entry 
+###  Data Entry 
 
 For a few numbers the easiest thing is to just type them in:
 ```{r}
@@ -60,7 +52,7 @@ x
 ```
 c() is a function that takes the objects inside the () and  **c**ombines them into one single object (a vector). 
 
-## Data Types in R
+### Data Types in R
 
 the most basic type of data in R is a **vector**, simply a list of values. 
 
@@ -102,7 +94,7 @@ what does this do?
 rep(1:10, 1:10)
 ```
 
-## Commands for Vectors
+### Commands for Vectors
 
 To find out how many elements a vector has use the *length* command: 
 
@@ -159,13 +151,13 @@ x[x>4]
 
 This, as we will see shortly, is EXTREMELY useful!
 
-## Data Frames
+### Data Frames
 
 data frames are the basic format for data in R. They are essentially vectors put together as columns. 
 
 The main thing you need to know about working with data frames are the following commands:
 
-### Case Study: UPR Admissions
+#### **Case Study**: UPR Admissions
 
 consider the  **upr** data set . This is the application data for all the students who applied and were accepted to UPR-Mayaguez between 2003 and 2013. 
 
@@ -216,7 +208,7 @@ there is also a detach command to undo an attach, but this is not usually needed
 
 **Note**: Say you are working first with a data set "students 2016" which has a column called Gender, and you attached it. Later (but in the same R session) you start working with a data set "students 2017" which also has a column called Gender, and you are attaching this one as well. If you use Gender now it will be from "students 2017".
 
-## Subsetting of Data Frames
+### Subsetting of Data Frames
 
 Consider the following data frame (not a real data set):
 
@@ -251,7 +243,7 @@ students[, 2]
 students[, -3]
 ```
 
-## Vector Arithmetic 
+### Vector Arithmetic 
 
 R allows us to apply any mathematical functions to a whole vector:
 

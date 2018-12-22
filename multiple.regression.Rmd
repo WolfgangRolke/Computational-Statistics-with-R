@@ -1,27 +1,20 @@
 ---
-title: Multiple Linear Regression
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-library(wolfr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
+
+## Multiple Linear Regression
 
 #### **Example**: House Prices
 
@@ -95,7 +88,7 @@ The highest correlation between predictors is r=0.743 (Floors-Baths)
 
 As in the case of polynomial regression, highly correlated predictors are a potential problem. We will look at a solution called *principle components* at some point. Here we are ok.
 
-## Best Subset Regression  
+### Variable Selection  
 
 We have previously talked about the fact that we want our models to be as simple as possible. Often that means a model with as few predictors as possible. So the question becomes:
 
@@ -137,7 +130,7 @@ There are several methods in wide use that are essentially based on this idea, s
 
 What we need is new idea:
 
-**Best Subset Regression and Mallow's C~p~**
+### Best Subset Regression and Mallow's C~p~
 
 We will find ALL possible models and calculate Mallow's C~p~ statistic for each. The model with the lowest C~p~ is best. 
 

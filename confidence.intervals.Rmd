@@ -1,30 +1,25 @@
 ---
-title: Confidence Intervals
 header-includes: \usepackage{color}
+                 \usepackage{float}
 output:
-  html_document: default
   pdf_document:
     fig_caption: no
+  html_document: default
 ---
-<style>
-table, th, td { text-align:right; }
-th, td {padding: 10px;}
-</style>
-
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-whichcomp <- strsplit(getwd(),"/")[[1]][3]
-load(paste0("c:/users/", whichcomp, "/Dropbox/teaching/Resma3/Resma3.RData"))
-library(knitr)
-opts_chunk$set(fig.width=6, fig.align = "center", 
-      out.width = "70%", warning=FALSE, message=FALSE)
-library(ggplot2)
-library(grid)
+source("R/setup.rmd.R", local=TRUE)
+setup.rmd(local.env=environment())
 ```
 `r hl()$basefontsize()`
+`r hl()$style()`
 
-In the last section we studied the problem of *point estimation*. Generally one also wants to have some idea of the accuracy of this estimate, that is one wants to calculate the standard error. Most commonly this is done by finding a *confidence interval*. 
+## Confidence Intervals
 
-## Coverage
+In the last section we studied the problem of *point estimation*. Generally one also wants to have some idea of the accuracy of this estimate, that is one wants to calculate the standard error. Most commonly this is done by finding a *confidence interval*.
+
+In essence this provides bounds for the likely values of the parameter. One can control the level of "likely".
+
+### Coverage
 
 the defining property of a confidence interval is its *coverage*, that is the probability that over many repeated experiments the true parameter lies inside the interval with the nominal level.
 
@@ -139,7 +134,7 @@ Notice the ragged appearance of the graph, which is quite typical for coverage g
 
 Notice also that the actual coverage is always a bit higher than the nominal one. In fact it is well known that the Clopper-Pearson limits are somewhat *conservative* (aka a bit large). They are still generally a good choice because they don't depend on any assumptions. 
 
-## Finding a Confidence Interval
+### Finding a Confidence Interval
 
 There are many ways to approach this problem, we will here discuss confidence intervals based on the method of maximum likelihood. 
 
@@ -476,7 +471,7 @@ ggplot(data=data.frame(x=1:12, y=Deaths), aes(x, y)) +
   geom_point()
 ```
 
-## Packages
+### R Libraries
 
 There are a number of packages available for maximum likelihood fitting:
 

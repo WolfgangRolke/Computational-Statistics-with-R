@@ -1,5 +1,6 @@
 ---
 title: "Transformations to Normality"
+                 \usepackage{float}
 output: html_document
 ---
 
